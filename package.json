@@ -1,0 +1,48 @@
+{
+  "name": "@yr/data-store",
+  "description": "",
+  "version": "1.0.0",
+  "author": "Alexander Pope <alexander.pope@nrk.no>",
+  "dependencies": {
+    "@yr/agent": "3.3.2",
+    "@yr/clock": "1.1.8",
+    "@yr/keys": "1.1.2",
+    "@yr/property": "3.1.5",
+    "@yr/runtime": "1.2.0",
+    "@yr/time": "3.1.1",
+    "debug": "2.2.0",
+    "eventemitter3": "1.2.0",
+    "is-plain-obj": "1.1.0",
+    "object-assign": "4.0.1"
+  },
+  "devDependencies": {
+    "buddy": "5.0.x",
+    "buddy-plugin-babel": "6.7.x",
+    "expect.js": "*",
+    "mocha": "*",
+    "mocha-phantomjs": "*",
+    "nock": "8.0.x"
+  },
+  "main": "src/index.js",
+  "repository": "https://github.com/YR/data-store.git",
+  "license": "MIT",
+  "scripts": {
+    "prepublish": "buddy build",
+    "test": "NODE_ENV=test mocha test/lib-test.js --reporter spec",
+    "test-client": "buddy build && mocha-phantomjs test/test-runner.html"
+  },
+  "browser": "index.js",
+  "build": {
+    "targets": [
+      {
+        "input": "src",
+        "output": ".",
+        "modular": false
+      },
+      {
+        "input": "src/index.js",
+        "output": "test/lib.js"
+      }
+    ]
+  }
+}
