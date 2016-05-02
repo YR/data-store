@@ -37,75 +37,140 @@ class DataStore extends Emitter {
    * @param {Object} [data]
    * @param {Object} [options]
    */
-  constructor (id, data, options = {}) {
+  constructor (id, data = {}, options = {}) {
     super();
 
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${--uid}`;
-    this.rootkey = '/';
-    this.isWritable = (options.isWritable) ? options.isWritable : true;
-    this._children = {};
-    this._childEvents = {};
+    this.isWritable = 'isWritable' in options ? options.isWritable : true;
     this._cursors = {};
-    this._data = data || {};
-    this._isDependant = false;
+    this._data = data;
+    this._delegates = {};
     this._loading = [];
     this._minExpiry = 'defaultExpiry' in options ? options.defaultExpiry : DEFAULT_EXPIRY;
-    this._parent = null;
-    this._root = this;
     this._retry = 'retry' in options ? options.retry : DEFAULT_LOAD_RETRY;
     this._shouldReload = options.reload;
-    this._serialisable = (options.serialisable) ? options.serialisable : {};
-    if (options.persistent) this._storage = options.persistent.storage;
+    this._serialisable = options.serialisable || {};
+    this._storage = options.storage;
     this._timeout = 'timeout' in options ? options.timeout : DEFAULT_LOAD_TIMEOUT;
+  }
 
-    this.get = this._delegate.bind(this, '_get');
-    this.set = this._delegate.bind(this, '_set');
-    this.remove = this._delegate.bind(this, '_remove');
-    this.update = this._delegate.bind(this, '_update');
-    this.load = this._delegate.bind(this, '_load');
-    this.reload = this._delegate.bind(this, '_reload');
-    this.cancelReload = this._delegate.bind(this, '_cancelReload');
+/*
+  bootstrap
+  get
+  set
+  load
+  reload
+  upgradeStorage
+*/
+
+  /**
+   * Bootstrap from storage
+   */
+  bootstrap () {
+    if (this._storage) {
+      const storageId = this.getStorageKey();
+      let data = this._storage.get(storageId);
+      let options = {
+        immutable: false,
+        persistent: false
+      };
+
+      // Invalidate on version mismatch
+      if (this._storage.shouldUpgrade(storageId)) {
+        data = this._upgradeStorage(data);
+        options.persistent = true;
+      }
+
+      for (const key in data) {
+        // Remove prefix
+        const k = keys.slice(key, 1);
+
+        // Treat as batch if no key
+        this.set(!k ? null : k, data[key], options);
+      }
+    }
   }
 
   /**
-   * Add a 'child' store with optional 'options'
-   * @param {DataStore} child
-   * @param {Object} [options]
-   * @returns {DataStore}
+   * Retrieve property value with `key`
+   * @param {String} [key]
+   * @returns {Object}
    */
-  addStore (child, options) {
-    options = assign({ isDependant: true }, options);
+  get (key) {
+    // Return all if no key specified
+    if (!key) return this._data;
 
-    function setRoot (root, child) {
-      child._root = root;
-      child.rootkey = keys.join(child._parent.rootkey, child.id);
-      // Update all children
-      for (const id in child._children) {
-        setRoot(root, child._children[id]);
+    const value = property.get(key, this._data);
+
+    // Check expiry
+    if (value && value.expires && time.now() > value.expires) {
+      value.expired = true;
+      value.expires = 0;
+      this.debug('WARNING data has expired "%s"', value.__ref || key);
+    }
+
+    return value;
+  }
+
+  /**
+   * Store prop 'key' with 'value'
+   * @param {String} key
+   * @param {Object} value
+   * @param {Object} [options]
+   * @returns {Object}
+   */
+  set (key, value, options) {
+    if (this.isWritable) {
+      options = assign({}, DEFAULT_SET_OPTIONS, options);
+
+      // Handle replacing underlying data store
+      if (key == null && isPlainObject(value)) {
+        this.debug('reset');
+        this._data = value;
+        return;
+      }
+
+      // Handle removal of key
+      if ('string' == typeof key && value == null) return this._remove(key);
+
+      // Store serialisability if not serialisable
+      if (!options.serialisable) {
+        this.setSerialisable(key, options.serialisable);
+      }
+
+      // Write reference key
+      if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
+      if (options.immutable) {
+        // Returns null if no change
+        const newData = property.set(key, value, this._data, options);
+
+        if (newData !== null) {
+          this._data = newData;
+        } else {
+          this.debug('WARNING no change after set "%s', key);
+        }
+      } else {
+        property.set(key, value, this._data, options);
+      }
+
+      // Handle persistence
+      if (options.persistent) {
+        // Store parent object if setting simple value
+        if (keys.length(key) > 1) key = keys.first(key);
+        this._persist(key);
       }
     }
 
-    // Create instance if passed factory
-    if (child.create != null) child = child.create(null, null, options);
-
-    if (options.isDependant) {
-      // Flag for eventual cleanup
-      child._isDependant = true;
-      child._parent = this;
-      setRoot(this._root, child);
-      child._bootstrap();
-    }
-
-    // Store child
-    if (!this._children[child.id]) {
-      this.debug('add %s "%s" at %s', options.isDependant ? 'dependant' : 'independant', child.id, child.rootkey);
-      this._children[child.id] = child;
-    }
-
-    return child;
+    return value;
   }
+
+
+
+
+
+
 
   /**
    * Determine if 'key' refers to a global property
@@ -124,18 +189,9 @@ class DataStore extends Emitter {
    */
   getRootKey (key = '') {
     if (!this.isRootKey(key)) {
-      key = keys.join(this.rootkey, key);
+      key = `/${key}`;
     }
     return key;
-  }
-
-  /**
-   * Determine if 'key' refers to a child store
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isChildKey (key) {
-    return !!this._children[keys.first(key)];
   }
 
   /**
@@ -204,128 +260,6 @@ class DataStore extends Emitter {
     }
 
     this._serialisable[key] = value;
-  }
-
-  /**
-   * Notify listeners
-   * Handles bubbling up parent tree
-   * @param {String} type
-   */
-  emit (type, ...args) {
-    // Notify listeners for this store
-    super.emit(type, ...args);
-
-    // Bubble
-    if (this._parent) {
-      // Update key
-      if (~type.indexOf(':')) {
-        type = type.replace(':', ':' + this.id + '/');
-      } else {
-        args[0] = keys.join(this.id, args[0]);
-      }
-      this._parent.emit(type, ...args);
-    }
-  }
-
-  /**
-   * Bootstrap from storage
-   */
-  _bootstrap () {
-    if (this._storage) {
-      const storageId = this.getStorageKey();
-      let data = this._storage.get(storageId);
-      let options = {
-        immutable: false,
-        persistent: false
-      };
-
-      // Invalidate on version mismatch
-      if (this._storage.shouldUpgrade(storageId)) {
-        data = this._upgradeStorage(data);
-        options.persistent = true;
-      }
-
-      for (const key in data) {
-        // Remove prefix
-        const k = keys.slice(key, 1);
-
-        // Treat as batch if no key
-        this.set(!k ? null : k, data[key], options);
-      }
-    }
-  }
-
-  /**
-   * Retrieve property value with `key`
-   * @param {String} [key]
-   * @returns {Object}
-   */
-  _get (key) {
-    // Return all if no key specified
-    if (!key) return this._data;
-
-    const value = property.get(key, this._data);
-
-    // Check expiry
-    if (value && value.expires && time.now() > value.expires) {
-      value.expired = true;
-      value.expires = 0;
-      this.debug('WARNING data has expired "%s"', value.__ref || key);
-    }
-
-    return value;
-  }
-
-  /**
-   * Store prop 'key' with 'value'
-   * @param {String} key
-   * @param {Object} value
-   * @param {Object} [options]
-   * @returns {Object}
-   */
-  _set (key, value, options) {
-    if (this.isWritable) {
-      options = assign({}, DEFAULT_SET_OPTIONS, options);
-
-      // Handle replacing underlying data store
-      if (key == null && isPlainObject(value)) {
-        this.debug('reset');
-        this._data = value;
-        return;
-      }
-
-      // Handle removal of key
-      if ('string' == typeof key && value == null) return this._remove(key);
-
-      // Store serialisability if not serialisable
-      if (!options.serialisable) {
-        this.setSerialisable(key, options.serialisable);
-      }
-
-      // Write reference key
-      if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
-      if (options.immutable) {
-        // Returns null if no change
-        const newData = property.set(key, value, this._data, options);
-
-        if (newData !== null) {
-          this._data = newData;
-        } else {
-          this.debug('WARNING no change after set "%s', key);
-        }
-      } else {
-        property.set(key, value, this._data, options);
-      }
-
-      // Handle persistence
-      if (options.persistent) {
-        // Store parent object if setting simple value
-        if (keys.length(key) > 1) key = keys.first(key);
-        this._persist(key);
-      }
-    }
-
-    return value;
   }
 
   /**
@@ -590,36 +524,18 @@ class DataStore extends Emitter {
   }
 
   /**
-   * Destroy instance and dependant children
+   * Destroy instance
    */
   destroy () {
-    // Destroy all dependant children
-    for (const id in this._children) {
-      const child = this._children[id];
-
-      child._parent = null;
-      child._root = child;
-      child.rootkey = '/';
-      // Only destroy dependant children
-      if (child._isDependant) {
-        child.destroy();
-      }
-    }
     // Destroy cursors
     for (const key in this._cursors) {
       this._cursors[key].destroy();
     }
-    this._children = {};
     this._cursors = {};
-    this._childEvents = {};
     this._data = {};
-    this._isDependant = false;
     this._loading = [];
-    this._parent = null;
-    this._root = null;
     this._serialisable = {};
     this._storage = null;
-    this.rootkey = '/';
     this.destroyed = true;
     this.removeAllListeners();
     clock.cancel(this.id);
@@ -628,18 +544,13 @@ class DataStore extends Emitter {
   /**
    * Dump all data, optionally stringified
    * @param {Boolean} stringify
-   * @returns {Object | String}
+   * @returns {Object|String}
    */
   dump (stringify) {
     let obj = {};
 
     for (const prop in this._data) {
       obj[prop] = this._data[prop];
-    }
-
-    // Add child props
-    for (const id in this._children) {
-      obj[id] = this._children[id].dump();
     }
 
     if (stringify) {
@@ -659,23 +570,8 @@ class DataStore extends Emitter {
    * @returns {Object}
    */
   toJSON (key) {
-    if (key) {
-      // Delegate to child if passed child key
-      return (this.isChildKey(key))
-        ? this._children[keys.first(key)].toJSON(keys.slice(key, 1))
-        : this._serialise(key, this.get(key));
-    }
-
-    const obj = this._serialise(null, this._data);
-
-    // Add child props
-    for (const child in this._children) {
-      if (this._serialisable[child] !== false) {
-        obj[child] = this._children[child].toJSON();
-      }
-    }
-
-    return obj;
+    if (key) return this._serialise(key, this.get(key));
+    return this._serialise(null, this._data);
   }
 
   /**
@@ -732,7 +628,6 @@ function getExpiry (timestamp, minimum) {
     : now + minimum;
 }
 
-// Export
 module.exports = DataStore;
 
 /**
