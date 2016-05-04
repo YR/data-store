@@ -44,9 +44,10 @@ class DataStore extends Emitter {
     this.destroyed = false;
     this.id = id || `store${--uid}`;
     this.isWritable = 'isWritable' in options ? options.isWritable : true;
+
     this._cursors = {};
     this._data = data;
-    this._delegates = {};
+    this._delegates = options.delegates;
     this._loading = [];
     this._minExpiry = 'defaultExpiry' in options ? options.defaultExpiry : DEFAULT_EXPIRY;
     this._retry = 'retry' in options ? options.retry : DEFAULT_LOAD_RETRY;
@@ -54,14 +55,25 @@ class DataStore extends Emitter {
     this._serialisable = options.serialisable || {};
     this._storage = options.storage;
     this._timeout = 'timeout' in options ? options.timeout : DEFAULT_LOAD_TIMEOUT;
+
+    if (this._delegates) {
+      for (const method in this._delegates) {
+        this[method] = this._delegate.bind(this, method);
+      }
+    }
+  }
+
+  _delegate (method, ...args) {
+
   }
 
 /*
-  bootstrap
   get
   set
   load
   reload
+
+  bootstrap
   upgradeStorage
 */
 
@@ -166,107 +178,11 @@ class DataStore extends Emitter {
     return value;
   }
 
-
-
-
-
-
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isRootKey (key) {
-    return key ? (key.charAt(0) == '/') : false;
-  }
-
-  /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-  getRootKey (key = '') {
-    if (!this.isRootKey(key)) {
-      key = `/${key}`;
-    }
-    return key;
-  }
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isStorageKey (key) {
-    const leading = (this.rootkey == '/')
-      // Non-nested stores must have a key based on id
-      ? keys.join(this.rootkey, this.id)
-      : this.rootkey;
-
-    return key ? (key.indexOf(leading.slice(1)) == 0) : false;
-  }
-
-  /**
-   * Retrieve storage version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-  getStorageKey (key) {
-    if (!this.isStorageKey(key)) {
-      key = (this.rootkey == '/')
-        // Make sure non-nested stores have a key based on id
-        ? keys.join(this.rootkey, this.id, key)
-        : keys.join(this.rootkey, key);
-      // Remove leading '/'
-      key = key.slice(1);
-    }
-    return key;
-  }
-
-  /**
-   * Retrieve an instance reference at 'key' to a subset of data
-   * @param {String} key
-   * @returns {DataStore}
-   */
-  createCursor (key) {
-    key = this.getRootKey(key);
-
-    let cursor = this._cursors[key];
-
-    // Create and store
-    if (!cursor) {
-      cursor = Cursor.create(key, this);
-      this._cursors[key] = cursor;
-    }
-
-    return cursor;
-  }
-
-  /**
-   * Store serialisability of 'key'
-   * @param {String} key
-   * @param {Boolean} value
-   */
-  setSerialisable (key, value) {
-    if (this.isRootKey(key)) key = key.slice(1);
-
-    if (isPlainObject(key)) {
-      for (const k in key) {
-        this.setSerialisable(k, value);
-      }
-    }
-
-    this._serialisable[key] = value;
-  }
-
   /**
    * Remove 'key'
    * @param {String} key
    */
-  _remove (key) {
+  unset (key) {
     // Remove prop from parent
     const length = keys.length(key);
     const k = (length == 1) ? key : keys.last(key);
@@ -296,7 +212,7 @@ class DataStore extends Emitter {
    * @param {Object} value
    * @param {Object} options
    */
-  _update (key, value, options = {}, ...args) {
+  update (key, value, options = {}, ...args) {
     if (this.isWritable) {
       // Handle reference keys
       // Use reference key to write to original object
@@ -325,7 +241,7 @@ class DataStore extends Emitter {
    * @param {Object} [options]
    * @returns {Response}
    */
-  _load (key, url, options = {}) {
+  load (key, url, options = {}) {
     const req = agent.get(url, options);
 
     if (!~this._loading.indexOf(key)) {
@@ -398,7 +314,7 @@ class DataStore extends Emitter {
    * @param {Object} [options]
    * @returns {null}
    */
-  _reload (key, url, options) {
+  reload (key, url, options) {
     // Already expired
     if (this.get(`${key}/expired`)) return this.load(key, url, options);
 
@@ -420,7 +336,7 @@ class DataStore extends Emitter {
   /**
    * Cancel any existing reload timeouts
    */
-  _cancelReload () {
+  cancelReload () {
     clock.cancel(this.id);
   }
 
@@ -428,7 +344,7 @@ class DataStore extends Emitter {
    * Save to local storage
    * @param {String} key
    */
-  _persist (key) {
+  persist (key) {
     if (this._storage) {
       this._storage.set(this.getStorageKey(key), this.toJSON(key));
     }
@@ -438,10 +354,106 @@ class DataStore extends Emitter {
    * Remove from local storage
    * @param {String} key
    */
-  _unpersist (key) {
+  unpersist (key) {
     if (this._storage) {
       this._storage.remove(this.getStorageKey(key));
     }
+  }
+
+  /**
+   * Retrieve an instance reference at 'key' to a subset of data
+   * @param {String} key
+   * @returns {DataStore}
+   */
+  createCursor (key) {
+    key = this.getRootKey(key);
+
+    let cursor = this._cursors[key];
+
+    // Create and store
+    if (!cursor) {
+      cursor = Cursor.create(key, this);
+      this._cursors[key] = cursor;
+    }
+
+    return cursor;
+  }
+
+  /**
+   * Store serialisability of 'key'
+   * @param {String} key
+   * @param {Boolean} value
+   */
+  setSerialisable (key, value) {
+    if (this.isRootKey(key)) key = key.slice(1);
+
+    if (isPlainObject(key)) {
+      for (const k in key) {
+        this.setSerialisable(k, value);
+      }
+    }
+
+    this._serialisable[key] = value;
+  }
+
+
+
+
+
+
+
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  isRootKey (key) {
+    return key ? (key.charAt(0) == '/') : false;
+  }
+
+  /**
+   * Retrieve global version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+  getRootKey (key = '') {
+    if (!this.isRootKey(key)) {
+      key = `/${key}`;
+    }
+    return key;
+  }
+
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  isStorageKey (key) {
+    const leading = (this.rootkey == '/')
+      // Non-nested stores must have a key based on id
+      ? keys.join(this.rootkey, this.id)
+      : this.rootkey;
+
+    return key ? (key.indexOf(leading.slice(1)) == 0) : false;
+  }
+
+  /**
+   * Retrieve storage version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+  getStorageKey (key) {
+    if (!this.isStorageKey(key)) {
+      key = (this.rootkey == '/')
+        // Make sure non-nested stores have a key based on id
+        ? keys.join(this.rootkey, this.id, key)
+        : keys.join(this.rootkey, key);
+      // Remove leading '/'
+      key = key.slice(1);
+    }
+    return key;
   }
 
   /**
@@ -485,43 +497,43 @@ class DataStore extends Emitter {
    * @param {String} method
    * @returns {Object|null}
    */
-  _delegate (method, ...args) {
-    const [key] = args;
+  // _delegate (method, ...args) {
+  //   const [key] = args;
 
-    if (!key) return this[method](...args);
+  //   if (!key) return this[method](...args);
 
-    if ('string' == typeof key) {
-      const [target, targetKey] = this._getStoreForKey(key);
+  //   if ('string' == typeof key) {
+  //     const [target, targetKey] = this._getStoreForKey(key);
 
-      // Delegate to target if no resolved key
-      if (targetKey === '') {
-        args = args.slice(1);
-        return target._delegate(method, ...args);
-      }
+  //     // Delegate to target if no resolved key
+  //     if (targetKey === '') {
+  //       args = args.slice(1);
+  //       return target._delegate(method, ...args);
+  //     }
 
-      // Overwrite key
-      args[0] = targetKey;
-      return target[method](...args);
-    }
+  //     // Overwrite key
+  //     args[0] = targetKey;
+  //     return target[method](...args);
+  //   }
 
-    // Handle batch (set, update, load, etc)
-    if (isPlainObject(key)) {
-      const add = args.slice(1);
+  //   // Handle batch (set, update, load, etc)
+  //   if (isPlainObject(key)) {
+  //     const add = args.slice(1);
 
-      for (const k in key) {
-        this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
-      }
-      return;
-    }
+  //     for (const k in key) {
+  //       this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
+  //     }
+  //     return;
+  //   }
 
-    // Handle array (get)
-    if (Array.isArray(key)) {
-      return key.map((k) => {
-        // 'get' only accepts 1 arg, so no need to handle additional here
-        return this._delegate.call(this, method, k);
-      });
-    }
-  }
+  //   // Handle array (get)
+  //   if (Array.isArray(key)) {
+  //     return key.map((k) => {
+  //       // 'get' only accepts 1 arg, so no need to handle additional here
+  //       return this._delegate.call(this, method, k);
+  //     });
+  //   }
+  // }
 
   /**
    * Destroy instance
