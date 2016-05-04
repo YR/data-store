@@ -108,8 +108,8 @@ describe('dataStore', function () {
       expect(c.get('bing')).to.have.property('expired', true);
       expect(c.get('bing')).to.have.property('expires', 0);
     });
-    it.only('should handle simple delegation', function () {
-      store._delegates = {
+    it('should handle simple delegation', function () {
+      store._handlers = {
         get: {
           foo: function (store, get, key) {
             return get('bar');
@@ -120,50 +120,12 @@ describe('dataStore', function () {
     });
   });
 
-  describe.skip('addStore()', function () {
-    it('should instantiate a dependant child instance when passed an instance factory', function () {
-      const child = store.addStore(Store);
-
-      expect(store._children).to.have.property(child.id);
-      expect(child).to.have.property('_parent', s);
-      expect(child).to.have.property('_root', s);
-      expect(child).to.have.property('_isDependant', true);
-    });
-    it('should store an dependant child instance when passed a DataStore instance', function () {
-      const c = Store.create('child');
-      const d = Store.create('grandchild');
-
-      c.addStore(d);
-      store.addStore(c);
-      expect(store._children).to.have.property('child');
-      expect(c).to.have.property('_isDependant', true);
-      expect(c).to.have.property('_parent', s);
-      expect(c).to.have.property('_root', s);
-      expect(d).to.have.property('rootkey', '/child/grandchild');
-      expect(d).to.have.property('_parent', c);
-      expect(d).to.have.property('_root', s);
-    });
-    it('should store an independant child instance', function () {
-      const c = Store.create('child');
-
-      store.addStore(c, { isDependant: false });
-      expect(store._children).to.have.property('child');
-      expect(c).to.have.property('_isDependant', false);
-    });
-  });
-
-  describe.skip('getRootKey()', function () {
+  describe('getRootKey()', function () {
     it('should not modify an existing global key', function () {
       expect(store.getRootKey('/foo')).to.equal('/foo');
     });
     it('should modify an existing local key', function () {
       expect(store.getRootKey('foo')).to.equal('/foo');
-    });
-    it('should modify an existing local key of a child store', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-
-      store.addStore(c);
-      expect(c.getRootKey('bing')).to.equal('/zing/bing');
     });
   });
 
@@ -206,24 +168,6 @@ describe('dataStore', function () {
       store.set('/foo/bar', 'bar');
       expect(store._data.foo.bar).to.equal('bar');
     });
-    it.skip('should modify a root property\'s value from a child store', function () {
-      const c = Store.create('zing');
-
-      store.addStore(c);
-      c.set('/foo/bar', 'bar');
-      expect(store._data.foo.bar).to.equal('bar');
-      c.set('/zing/bar', 'bar');
-      expect(c._data.bar).to.equal('bar');
-    });
-    it.skip('should modify a deeply nested property\'s value for a child store', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-      const d = Store.create('bung', { bing: 'bong' });
-
-      store.addStore(c);
-      c.addStore(d);
-      store.set('zing/bung/bing', 'bung');
-      expect(d._data.bing).to.equal('bung');
-    });
     it('should allow batch writes', function () {
       store.set({
         test: 'success',
@@ -232,48 +176,20 @@ describe('dataStore', function () {
       expect(store._data.test).to.equal('success');
       expect(store._data.boop).to.have.property('bar', 'foo');
     });
-    it.skip('should allow batch writes with nested keys', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-
-      store.addStore(c);
+    it('should allow batch writes with delegation', function () {
+      store._handlers = {
+        set: {
+          zing: function (store, set, key, value, options) {
+            return set(key, 'bar');
+          }
+        }
+      };
       store.set({
         test: 'success',
         'zing/bing': 'foo'
       });
       expect(store._data.test).to.equal('success');
-      expect(c._data.bing).to.equal('foo');
-    });
-    it.skip('should allow batch writes with mixed root/nested keys', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-
-      store.addStore(c);
-      c.set({
-        '/test': 'success',
-        bing: 'foo',
-        '/zing/boo': 'boo'
-      });
-      expect(store._data.test).to.equal('success');
-      expect(c._data.bing).to.equal('foo');
-      expect(c._data.boo).to.equal('boo');
-    });
-    it.skip('should allow batch writes with mixed root/deeply nested keys', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-      const d = Store.create('bung', { bing: 'bong' });
-
-      store.addStore(c);
-      c.addStore(d);
-      store.set({
-        '/test': 'success',
-        bing: 'foo',
-        zing: {
-          bung: {
-            foo: 'boo'
-          }
-        }
-      });
-      expect(store._data.test).to.equal('success');
-      expect(store._data.bing).to.equal('foo');
-      expect(d._data.foo).to.equal('boo');
+      expect(store._data.zing.bing).to.equal('bar');
     });
     it('should do nothing if dataStore is not writable', function () {
       store.isWritable = false;
@@ -286,16 +202,9 @@ describe('dataStore', function () {
       store.set(null, obj);
       expect(store._data).to.eql(obj);
     });
-    it('should return an object with "__ref" property when called with "optionstore.reference"', function () {
+    it('should return an object with "__ref" property when called with "options.reference"', function () {
       store.set('boo', { bar: 'bar' }, { reference: true });
       expect(store._data.boo).to.have.property('__ref', '/boo');
-    });
-    it.skip('should return an object with "__ref" property when called with "optionstore.reference" from a child store', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-
-      store.addStore(c);
-      c.set('boo', { bar: 'bar' }, { reference: true });
-      expect(c._data.boo).to.have.property('__ref', '/zing/boo');
     });
     it('should remove a key when null value specified', function () {
       store.set('foo/boo', null);
@@ -307,7 +216,7 @@ describe('dataStore', function () {
       store.set('a', null);
       expect(store.get()).to.not.have.property('a');
     });
-    it('should persist data to storage', function (done) {
+    it.skip('should persist data to storage', function (done) {
       store._storage = storage;
       store.set('bar', 'foo', { persistent: true });
       store.set('foo/bar', { bat: 'boo' }, { persistent: true });
@@ -322,39 +231,25 @@ describe('dataStore', function () {
     });
   });
 
-  describe('remove()', function () {
+  describe('unset()', function () {
     it('should remove a key', function (done) {
-      store.on('remove:bar', (value, oldValue) => {
+      store.on('unset:bar', (value, oldValue) => {
         expect(value).to.equal(null);
         expect(oldValue).to.equal('bat');
         expect(store.get('bar')).to.eql(undefined);
         done();
       });
-      store.remove('bar');
+      store.unset('bar');
     });
     it('should not remove a key that doesn\'t exist', function (done) {
-      store.on('remove', (value, oldValue) => {
+      store.on('unset', (value, oldValue) => {
         throw new Error('nope');
       });
       setTimeout(() => {
         expect(store.get('zing')).to.eql(undefined);
         done();
       }, 40);
-      store.remove('zing');
-    });
-    it('should bubble notification for a nested child store', function (done) {
-      const c = Store.create('zing', { bing: 'bong' });
-      const d = Store.create('bung', { bing: 'bong' });
-
-      store.addStore(c);
-      c.addStore(d);
-      store.on('remove', (key, value, oldValue) => {
-        expect(key).to.equal('zing/bung/bing');
-        expect(value).to.equal(null);
-        expect(oldValue).to.equal('bong');
-        done();
-      });
-      d.remove('bing');
+      store.unset('zing');
     });
   });
 
@@ -366,34 +261,11 @@ describe('dataStore', function () {
       });
       store.emit('update', 'foo');
     });
-    it('should bubble events to parent when notifing listeners', function (done) {
-      const c = Store.create('zing');
-      let i = 0;
-
-      store.addStore(c);
-      c.on('update:foo', (value) => {
-        expect(value).to.be('bar');
-        ++i;
-      });
-      store.on('update:zing/foo', (value) => {
-        expect(value).to.be('bar');
-        expect(++i).to.eql(2);
-        done();
-      });
-      c.emit('update:foo', 'bar');
-    });
   });
 
   describe('update()', function () {
     it('should set a value for "key"', function () {
       store.update('bar', 'bar');
-      expect(store.get('bar')).to.equal('bar');
-    });
-    it('should set a value for a root "key"', function () {
-      const c = Store.create('zing');
-
-      store.addStore(c);
-      c.update('/bar', 'bar');
       expect(store.get('bar')).to.equal('bar');
     });
     it('should write to originally referenced objects if "__ref"', function () {
@@ -480,44 +352,6 @@ describe('dataStore', function () {
           expect(store.get('foo').__ref).to.eql('/foo');
           done();
         });
-    });
-    it('should load and store data for "key" of a nested child store', function (done) {
-      const c = Store.create('zing', { bing: 'bong' });
-      const d = Store.create('bung', { bing: 'bong' });
-
-      store.addStore(c);
-      c.addStore(d);
-      fake
-        .get('/foo')
-        .reply(200, { foo: 'foo' });
-      store.load('zing/bung/bing', 'http://localhost/foo', { merge: false })
-        .end((err, res) => {
-          if (err) done(err);
-          expect(store.get('zing/bung/bing')).to.eql({ foo: 'foo' });
-          done();
-        });
-    });
-    it('should load and notify for "key" of a nested child store', function (done) {
-      const c = Store.create('zing', { bing: 'bong' });
-      const d = Store.create('bung', { bing: 'bong' });
-      let test = false;
-
-      store.addStore(c);
-      c.addStore(d);
-      fake
-        .get('/foo')
-        .reply(200, { foo: 'foo' });
-      store.on('load:zing/bung/bing', (value, oldValue) => {
-        expect(store.get('zing/bung/bing')).to.eql({ foo: 'foo' });
-        test = true;
-      });
-      c.on('load', (key, value, oldValue) => {
-        expect(test).to.be(true);
-        expect(key).to.eql('bung/bing');
-        expect(value).to.eql({ foo: 'foo' });
-        done();
-      });
-      store.load('zing/bung/bing', 'http://localhost/foo');
     });
     it('should reload "key" after expiry with "optionstore.reload = true"', function (done) {
       fake
@@ -626,7 +460,7 @@ describe('dataStore', function () {
     });
   });
 
-  describe('cursors', function () {
+  describe.skip('cursors', function () {
     describe('createCursor()', function () {
       it('should generate a cursor instance', function () {
         const cursor = store.createCursor();
@@ -737,25 +571,6 @@ describe('dataStore', function () {
       expect(store.destroyed).to.eql(true);
       expect(store._data).to.eql({});
     });
-    it('should destroy all dependant children', function () {
-      const c = Store.create('zing', { foo: 'bar' });
-
-      store.addStore(c);
-      store.destroy();
-      expect(c.destroyed).to.eql(true);
-      expect(c._data).to.eql({});
-    });
-    it('should not destroy independant children', function () {
-      const c = Store.create('zing', { foo: 'bar' });
-
-      store.addStore(c, { isDependant: false });
-      store.destroy();
-      expect(c.destroyed).to.eql(false);
-      expect(c._data).to.eql({ foo: 'bar' });
-      expect(c._root).to.eql(c);
-      expect(c._parent).to.eql(null);
-      expect(c.rootkey).to.eql('/');
-    });
   });
 
   describe('dump()', function () {
@@ -779,19 +594,8 @@ describe('dataStore', function () {
       expect(json).to.be.an.Object;
       expect(json.bar).to.equal('bat');
     });
-    it('should return a serialisable json object for nested stores', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-      const d = Store.create('bung', { bing: 'bong' });
-
-      c.addStore(d);
-      store.addStore(c);
-      const json = store.toJSON();
-
-      expect(json).to.be.an.Object;
-      expect(json.zing.bung.bing).to.equal('bong');
-    });
     it('should return a serialisable json object with correctly handled array properties', function () {
-      const json = JSON.stringify(s);
+      const json = JSON.stringify(store);
 
       expect(json).to.be.a.String;
       expect(json).to.match(/"bat":\["foo","bar"\]/);

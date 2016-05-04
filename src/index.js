@@ -28,7 +28,7 @@ const DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
-const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'load', 'reload'];
+const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'load', 'reload', 'persist', 'unpersist'];
 let uid = 0;
 
 class DataStore extends Emitter {
@@ -48,7 +48,7 @@ class DataStore extends Emitter {
 
     this._cursors = {};
     this._data = data;
-    this._delegates = options.delegates;
+    this._handlers = options.handlers;
     this._loading = [];
     this._minExpiry = 'defaultExpiry' in options ? options.defaultExpiry : DEFAULT_EXPIRY;
     this._retry = 'retry' in options ? options.retry : DEFAULT_LOAD_RETRY;
@@ -60,12 +60,40 @@ class DataStore extends Emitter {
     for (const method of DELEGATED_METHODS) {
       const privateMethod = `_${method}`;
 
-      this[method] = this._delegate.bind(this, privateMethod);
+      this[method] = this._route.bind(this, privateMethod);
       this[privateMethod] = this[privateMethod].bind(this);
     }
   }
 
-  _delegate (method, ...args) {
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  isRootKey (key) {
+    return key ? (key.charAt(0) == '/') : false;
+  }
+
+  /**
+   * Retrieve global version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+  getRootKey (key = '') {
+    if (!this.isRootKey(key)) {
+      key = `/${key}`;
+    }
+    return key;
+  }
+
+  /**
+   * Route 'method' to appropriate handler
+   * depending on passed 'key' (args[0])
+   * @param {String} method
+   * @returns {Object|null}
+   */
+  _route (method, ...args) {
     let [key = '', ...rest] = args;
 
     if (!key) return this[method](...args);
@@ -73,91 +101,28 @@ class DataStore extends Emitter {
     if ('string' == typeof key) {
       if (key.charAt(0) == '/') key = key.slice(1);
 
-      const delegate = keys.first(key);
+      const handler = keys.first(key);
       const publicMethod = method.slice(1);
 
-      if (delegate && this._delegates && delegate in this._delegates[publicMethod]) {
-        return this._delegates[publicMethod][delegate](this, this[method], key, ...rest);
+      // Route to handler if it exists
+      if (handler && this._handlers && handler in this._handlers[publicMethod]) {
+        return this._handlers[publicMethod][handler](this, this[method], key, ...rest);
       }
       return this[method](key, ...rest);
     }
 
+    // Batch (set, update, load, etc)
     if (isPlainObject(key)) {
       for (const k in key) {
-        this._delegate(method, k, key[k], ...rest);
+        this._route(method, k, key[k], ...rest);
       }
       return;
     }
 
+    // Array of keys (get)
     if (Array.isArray(key)) {
       return key.map((k) => {
-        return this._delegate(method, k, ...rest);
-      });
-    }
-  }
-
-  /**
-   * Retrieve store for 'key'
-   * @param {String} key
-   * @returns {DataStore}
-   */
-  _getStoreForKey (key) {
-    let context = this;
-
-    key = key || '';
-    if (!key) return [context, key];
-
-    if (key.charAt(0) == '/') {
-      context = this._root;
-      key = key.slice(1);
-    }
-
-    const first = keys.first(key);
-
-    if (context._children[first]) return context._children[first]._getStoreForKey(keys.slice(key, 1));
-    return [context, key];
-  }
-
-  /**
-   * Delegate 'method' to appropriate store (root, current, or child)
-   * depending on passed 'key' (args[0])
-   * @param {String} method
-   * @returns {Object|null}
-   */
-  __delegate__ (method, ...args) {
-    const [key] = args;
-
-    if (!key) return this[method](...args);
-
-    if ('string' == typeof key) {
-      const [target, targetKey] = this._getStoreForKey(key);
-
-      // Delegate to target if no resolved key
-      if (targetKey === '') {
-        args = args.slice(1);
-        return target._delegate(method, ...args);
-      }
-
-      // Overwrite key
-      args[0] = targetKey;
-      return target[method](...args);
-    }
-
-    // Handle batch (set, update, load, etc)
-    if (isPlainObject(key)) {
-      const add = args.slice(1);
-
-      for (const k in key) {
-        this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
-      }
-      return;
-    }
-
-    // Handle array (get)
-    if (Array.isArray(key)) {
-      return key.map((k) => {
-        // 'get' only accepts 1 arg, so no need to handle additional here
-        return this._delegate.call(this, method, k);
+        return this._route(method, k, ...rest);
       });
     }
   }
@@ -178,6 +143,7 @@ class DataStore extends Emitter {
       value.expired = true;
       value.expires = 0;
       this.debug('WARNING data has expired "%s"', value.__ref || key);
+      // TODO: load if not reloading?
     }
 
     return value;
@@ -243,21 +209,21 @@ class DataStore extends Emitter {
     // Remove prop from parent
     const length = keys.length(key);
     const k = (length == 1) ? key : keys.last(key);
-    const data = (length == 1) ? this._data : this.get(keys.slice(key, 0, -1));
+    const data = (length == 1) ? this._data : this._get(keys.slice(key, 0, -1));
 
     // Only remove existing props
     // Prevent recursive trap
     if (data && k in data) {
       const oldValue = data[k];
 
-      this.debug('remove "%s"', key);
+      this.debug('unset "%s"', key);
       delete data[k];
       this.unpersist(key);
 
       // Delay to prevent race condition (view render)
       clock.immediate(() => {
-        this.emit('remove:' + key, null, oldValue);
-        this.emit('remove', key, null, oldValue);
+        this.emit('unset:' + key, null, oldValue);
+        this.emit('unset', key, null, oldValue);
       });
     }
   }
@@ -314,7 +280,7 @@ class DataStore extends Emitter {
           if (err) {
             this.debug('remote resource "%s" not found at %s', key, url);
             // Remove if no longer found
-            if (err.status < 500) this.remove(key);
+            if (err.status < 500) this.unset(key);
           } else {
             this.debug('loaded "%s" in %dms', key, res.duration);
 
@@ -401,7 +367,7 @@ class DataStore extends Emitter {
    * Save to local storage
    * @param {String} key
    */
-  persist (key) {
+  _persist (key) {
     if (this._storage) {
       this._storage.set(this.getStorageKey(key), this.toJSON(key));
     }
@@ -411,7 +377,7 @@ class DataStore extends Emitter {
    * Remove from local storage
    * @param {String} key
    */
-  unpersist (key) {
+  _unpersist (key) {
     if (this._storage) {
       this._storage.remove(this.getStorageKey(key));
     }
@@ -453,107 +419,6 @@ class DataStore extends Emitter {
     this._serialisable[key] = value;
   }
 
-
-
-
-
-  /**
-   * Bootstrap from storage
-   */
-  bootstrap () {
-    if (this._storage) {
-      const storageId = this.getStorageKey();
-      let data = this._storage.get(storageId);
-      let options = {
-        immutable: false,
-        persistent: false
-      };
-
-      // Invalidate on version mismatch
-      if (this._storage.shouldUpgrade(storageId)) {
-        data = this._upgradeStorage(data);
-        options.persistent = true;
-      }
-
-      for (const key in data) {
-        // Remove prefix
-        const k = keys.slice(key, 1);
-
-        // Treat as batch if no key
-        this.set(!k ? null : k, data[key], options);
-      }
-    }
-  }
-
-
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isRootKey (key) {
-    return key ? (key.charAt(0) == '/') : false;
-  }
-
-  /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-  getRootKey (key = '') {
-    if (!this.isRootKey(key)) {
-      key = `/${key}`;
-    }
-    return key;
-  }
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isStorageKey (key) {
-    const leading = (this.rootkey == '/')
-      // Non-nested stores must have a key based on id
-      ? keys.join(this.rootkey, this.id)
-      : this.rootkey;
-
-    return key ? (key.indexOf(leading.slice(1)) == 0) : false;
-  }
-
-  /**
-   * Retrieve storage version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-  getStorageKey (key) {
-    if (!this.isStorageKey(key)) {
-      key = (this.rootkey == '/')
-        // Make sure non-nested stores have a key based on id
-        ? keys.join(this.rootkey, this.id, key)
-        : keys.join(this.rootkey, key);
-      // Remove leading '/'
-      key = key.slice(1);
-    }
-    return key;
-  }
-
-  /**
-   * Update storage when versions don't match
-   * @param {Object} data
-   * @param {Object} options
-   * @returns {Object}
-   */
-  _upgradeStorage (data, options) {
-    for (const key in data) {
-      this._storage.remove(key);
-    }
-    return data;
-  }
-
   /**
    * Destroy instance
    */
@@ -564,6 +429,7 @@ class DataStore extends Emitter {
     }
     this._cursors = {};
     this._data = {};
+    this._handlers = {};
     this._loading = [];
     this._serialisable = {};
     this._storage = null;
@@ -640,6 +506,83 @@ class DataStore extends Emitter {
       ? data
       : null;
   }
+
+
+
+
+  /**
+   * Bootstrap from storage
+   */
+  bootstrap () {
+    if (this._storage) {
+      const storageId = this.getStorageKey();
+      let data = this._storage.get(storageId);
+      let options = {
+        immutable: false,
+        persistent: false
+      };
+
+      // Invalidate on version mismatch
+      if (this._storage.shouldUpgrade(storageId)) {
+        data = this._upgradeStorage(data);
+        options.persistent = true;
+      }
+
+      for (const key in data) {
+        // Remove prefix
+        const k = keys.slice(key, 1);
+
+        // Treat as batch if no key
+        this.set(!k ? null : k, data[key], options);
+      }
+    }
+  }
+
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  isStorageKey (key) {
+    const leading = (this.rootkey == '/')
+      // Non-nested stores must have a key based on id
+      ? keys.join(this.rootkey, this.id)
+      : this.rootkey;
+
+    return key ? (key.indexOf(leading.slice(1)) == 0) : false;
+  }
+
+  /**
+   * Retrieve storage version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+  getStorageKey (key) {
+    if (!this.isStorageKey(key)) {
+      key = (this.rootkey == '/')
+        // Make sure non-nested stores have a key based on id
+        ? keys.join(this.rootkey, this.id, key)
+        : keys.join(this.rootkey, key);
+      // Remove leading '/'
+      key = key.slice(1);
+    }
+    return key;
+  }
+
+  /**
+   * Update storage when versions don't match
+   * @param {Object} data
+   * @param {Object} options
+   * @returns {Object}
+   */
+  _upgradeStorage (data, options) {
+    for (const key in data) {
+      this._storage.remove(key);
+    }
+    return data;
+  }
+
 }
 
 /**
