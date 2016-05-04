@@ -28,6 +28,7 @@ const DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
+const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'load', 'reload'];
 let uid = 0;
 
 class DataStore extends Emitter {
@@ -56,52 +57,108 @@ class DataStore extends Emitter {
     this._storage = options.storage;
     this._timeout = 'timeout' in options ? options.timeout : DEFAULT_LOAD_TIMEOUT;
 
-    if (this._delegates) {
-      for (const method in this._delegates) {
-        this[method] = this._delegate.bind(this, method);
-      }
+    for (const method of DELEGATED_METHODS) {
+      const privateMethod = `_${method}`;
+
+      this[method] = this._delegate.bind(this, privateMethod);
+      this[privateMethod] = this[privateMethod].bind(this);
     }
   }
 
   _delegate (method, ...args) {
+    let [key = '', ...rest] = args;
 
+    if (!key) return this[method](...args);
+
+    if ('string' == typeof key) {
+      if (key.charAt(0) == '/') key = key.slice(1);
+
+      const delegate = keys.first(key);
+      const publicMethod = method.slice(1);
+
+      if (delegate && this._delegates && delegate in this._delegates[publicMethod]) {
+        return this._delegates[publicMethod][delegate](this, this[method], key, ...rest);
+      }
+      return this[method](key, ...rest);
+    }
+
+    if (isPlainObject(key)) {
+      for (const k in key) {
+        this._delegate(method, k, key[k], ...rest);
+      }
+      return;
+    }
+
+    if (Array.isArray(key)) {
+      return key.map((k) => {
+        return this._delegate(method, k, ...rest);
+      });
+    }
   }
 
-/*
-  get
-  set
-  load
-  reload
+  /**
+   * Retrieve store for 'key'
+   * @param {String} key
+   * @returns {DataStore}
+   */
+  _getStoreForKey (key) {
+    let context = this;
 
-  bootstrap
-  upgradeStorage
-*/
+    key = key || '';
+    if (!key) return [context, key];
+
+    if (key.charAt(0) == '/') {
+      context = this._root;
+      key = key.slice(1);
+    }
+
+    const first = keys.first(key);
+
+    if (context._children[first]) return context._children[first]._getStoreForKey(keys.slice(key, 1));
+    return [context, key];
+  }
 
   /**
-   * Bootstrap from storage
+   * Delegate 'method' to appropriate store (root, current, or child)
+   * depending on passed 'key' (args[0])
+   * @param {String} method
+   * @returns {Object|null}
    */
-  bootstrap () {
-    if (this._storage) {
-      const storageId = this.getStorageKey();
-      let data = this._storage.get(storageId);
-      let options = {
-        immutable: false,
-        persistent: false
-      };
+  __delegate__ (method, ...args) {
+    const [key] = args;
 
-      // Invalidate on version mismatch
-      if (this._storage.shouldUpgrade(storageId)) {
-        data = this._upgradeStorage(data);
-        options.persistent = true;
+    if (!key) return this[method](...args);
+
+    if ('string' == typeof key) {
+      const [target, targetKey] = this._getStoreForKey(key);
+
+      // Delegate to target if no resolved key
+      if (targetKey === '') {
+        args = args.slice(1);
+        return target._delegate(method, ...args);
       }
 
-      for (const key in data) {
-        // Remove prefix
-        const k = keys.slice(key, 1);
+      // Overwrite key
+      args[0] = targetKey;
+      return target[method](...args);
+    }
 
-        // Treat as batch if no key
-        this.set(!k ? null : k, data[key], options);
+    // Handle batch (set, update, load, etc)
+    if (isPlainObject(key)) {
+      const add = args.slice(1);
+
+      for (const k in key) {
+        this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
       }
+      return;
+    }
+
+    // Handle array (get)
+    if (Array.isArray(key)) {
+      return key.map((k) => {
+        // 'get' only accepts 1 arg, so no need to handle additional here
+        return this._delegate.call(this, method, k);
+      });
     }
   }
 
@@ -110,7 +167,7 @@ class DataStore extends Emitter {
    * @param {String} [key]
    * @returns {Object}
    */
-  get (key) {
+  _get (key) {
     // Return all if no key specified
     if (!key) return this._data;
 
@@ -133,7 +190,7 @@ class DataStore extends Emitter {
    * @param {Object} [options]
    * @returns {Object}
    */
-  set (key, value, options) {
+  _set (key, value, options) {
     if (this.isWritable) {
       options = assign({}, DEFAULT_SET_OPTIONS, options);
 
@@ -145,7 +202,7 @@ class DataStore extends Emitter {
       }
 
       // Handle removal of key
-      if ('string' == typeof key && value == null) return this._remove(key);
+      if ('string' == typeof key && value == null) return this._unset(key);
 
       // Store serialisability if not serialisable
       if (!options.serialisable) {
@@ -171,7 +228,7 @@ class DataStore extends Emitter {
       if (options.persistent) {
         // Store parent object if setting simple value
         if (keys.length(key) > 1) key = keys.first(key);
-        this._persist(key);
+        this.persist(key);
       }
     }
 
@@ -182,7 +239,7 @@ class DataStore extends Emitter {
    * Remove 'key'
    * @param {String} key
    */
-  unset (key) {
+  _unset (key) {
     // Remove prop from parent
     const length = keys.length(key);
     const k = (length == 1) ? key : keys.last(key);
@@ -195,7 +252,7 @@ class DataStore extends Emitter {
 
       this.debug('remove "%s"', key);
       delete data[k];
-      this._unpersist(key);
+      this.unpersist(key);
 
       // Delay to prevent race condition (view render)
       clock.immediate(() => {
@@ -212,7 +269,7 @@ class DataStore extends Emitter {
    * @param {Object} value
    * @param {Object} options
    */
-  update (key, value, options = {}, ...args) {
+  _update (key, value, options = {}, ...args) {
     if (this.isWritable) {
       // Handle reference keys
       // Use reference key to write to original object
@@ -241,7 +298,7 @@ class DataStore extends Emitter {
    * @param {Object} [options]
    * @returns {Response}
    */
-  load (key, url, options = {}) {
+  _load (key, url, options = {}) {
     const req = agent.get(url, options);
 
     if (!~this._loading.indexOf(key)) {
@@ -314,7 +371,7 @@ class DataStore extends Emitter {
    * @param {Object} [options]
    * @returns {null}
    */
-  reload (key, url, options) {
+  _reload (key, url, options) {
     // Already expired
     if (this.get(`${key}/expired`)) return this.load(key, url, options);
 
@@ -400,6 +457,34 @@ class DataStore extends Emitter {
 
 
 
+  /**
+   * Bootstrap from storage
+   */
+  bootstrap () {
+    if (this._storage) {
+      const storageId = this.getStorageKey();
+      let data = this._storage.get(storageId);
+      let options = {
+        immutable: false,
+        persistent: false
+      };
+
+      // Invalidate on version mismatch
+      if (this._storage.shouldUpgrade(storageId)) {
+        data = this._upgradeStorage(data);
+        options.persistent = true;
+      }
+
+      for (const key in data) {
+        // Remove prefix
+        const k = keys.slice(key, 1);
+
+        // Treat as batch if no key
+        this.set(!k ? null : k, data[key], options);
+      }
+    }
+  }
+
 
 
   /**
@@ -468,72 +553,6 @@ class DataStore extends Emitter {
     }
     return data;
   }
-
-  /**
-   * Retrieve store for 'key'
-   * @param {String} key
-   * @returns {DataStore}
-   */
-  _getStoreForKey (key) {
-    let context = this;
-
-    key = key || '';
-    if (!key) return [context, key];
-
-    if (key.charAt(0) == '/') {
-      context = this._root;
-      key = key.slice(1);
-    }
-
-    const first = keys.first(key);
-
-    if (context._children[first]) return context._children[first]._getStoreForKey(keys.slice(key, 1));
-    return [context, key];
-  }
-
-  /**
-   * Delegate 'method' to appropriate store (root, current, or child)
-   * depending on passed 'key' (args[0])
-   * @param {String} method
-   * @returns {Object|null}
-   */
-  // _delegate (method, ...args) {
-  //   const [key] = args;
-
-  //   if (!key) return this[method](...args);
-
-  //   if ('string' == typeof key) {
-  //     const [target, targetKey] = this._getStoreForKey(key);
-
-  //     // Delegate to target if no resolved key
-  //     if (targetKey === '') {
-  //       args = args.slice(1);
-  //       return target._delegate(method, ...args);
-  //     }
-
-  //     // Overwrite key
-  //     args[0] = targetKey;
-  //     return target[method](...args);
-  //   }
-
-  //   // Handle batch (set, update, load, etc)
-  //   if (isPlainObject(key)) {
-  //     const add = args.slice(1);
-
-  //     for (const k in key) {
-  //       this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
-  //     }
-  //     return;
-  //   }
-
-  //   // Handle array (get)
-  //   if (Array.isArray(key)) {
-  //     return key.map((k) => {
-  //       // 'get' only accepts 1 arg, so no need to handle additional here
-  //       return this._delegate.call(this, method, k);
-  //     });
-  //   }
-  // }
 
   /**
    * Destroy instance

@@ -40,7 +40,8 @@ var DataStore = function (_Emitter) {
    * @param {Object} [options]
    */
 
-  function DataStore(id, data) {
+  function DataStore(id) {
+    var data = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
     var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
     babelHelpers.classCallCheck(this, DataStore);
 
@@ -49,223 +50,45 @@ var DataStore = function (_Emitter) {
     _this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     _this.destroyed = false;
     _this.id = id || 'store' + --uid;
-    _this.rootkey = '/';
-    _this.isWritable = options.isWritable ? options.isWritable : true;
-    _this._children = {};
-    _this._childEvents = {};
+    _this.isWritable = 'isWritable' in options ? options.isWritable : true;
+
     _this._cursors = {};
-    _this._data = data || {};
-    _this._isDependant = false;
+    _this._data = data;
+    _this._delegates = options.delegates;
     _this._loading = [];
     _this._minExpiry = 'defaultExpiry' in options ? options.defaultExpiry : DEFAULT_EXPIRY;
-    _this._parent = null;
-    _this._root = _this;
     _this._retry = 'retry' in options ? options.retry : DEFAULT_LOAD_RETRY;
     _this._shouldReload = options.reload;
-    _this._serialisable = options.serialisable ? options.serialisable : {};
-    if (options.persistent) _this._storage = options.persistent.storage;
+    _this._serialisable = options.serialisable || {};
+    _this._storage = options.storage;
     _this._timeout = 'timeout' in options ? options.timeout : DEFAULT_LOAD_TIMEOUT;
 
-    _this.get = _this._delegate.bind(_this, '_get');
-    _this.set = _this._delegate.bind(_this, '_set');
-    _this.remove = _this._delegate.bind(_this, '_remove');
-    _this.update = _this._delegate.bind(_this, '_update');
-    _this.load = _this._delegate.bind(_this, '_load');
-    _this.reload = _this._delegate.bind(_this, '_reload');
-    _this.cancelReload = _this._delegate.bind(_this, '_cancelReload');
+    if (_this._delegates) {
+      for (var method in _this._delegates) {
+        _this[method] = _this._delegate.bind(_this, method);
+      }
+    }
     return _this;
   }
 
-  /**
-   * Add a 'child' store with optional 'options'
-   * @param {DataStore} child
-   * @param {Object} [options]
-   * @returns {DataStore}
-   */
+  DataStore.prototype._delegate = function _delegate(method) {};
 
-
-  DataStore.prototype.addStore = function addStore(child, options) {
-    options = assign({ isDependant: true }, options);
-
-    function setRoot(root, child) {
-      child._root = root;
-      child.rootkey = keys.join(child._parent.rootkey, child.id);
-      // Update all children
-      for (var id in child._children) {
-        setRoot(root, child._children[id]);
-      }
-    }
-
-    // Create instance if passed factory
-    if (child.create != null) child = child.create(null, null, options);
-
-    if (options.isDependant) {
-      // Flag for eventual cleanup
-      child._isDependant = true;
-      child._parent = this;
-      setRoot(this._root, child);
-      child._bootstrap();
-    }
-
-    // Store child
-    if (!this._children[child.id]) {
-      this.debug('add %s "%s" at %s', options.isDependant ? 'dependant' : 'independant', child.id, child.rootkey);
-      this._children[child.id] = child;
-    }
-
-    return child;
-  };
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-
-
-  DataStore.prototype.isRootKey = function isRootKey(key) {
-    return key ? key.charAt(0) == '/' : false;
-  };
-
-  /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-
-
-  DataStore.prototype.getRootKey = function getRootKey() {
-    var key = arguments.length <= 0 || arguments[0] === undefined ? '' : arguments[0];
-
-    if (!this.isRootKey(key)) {
-      key = keys.join(this.rootkey, key);
-    }
-    return key;
-  };
-
-  /**
-   * Determine if 'key' refers to a child store
-   * @param {String} key
-   * @returns {Boolean}
-   */
-
-
-  DataStore.prototype.isChildKey = function isChildKey(key) {
-    return !!this._children[keys.first(key)];
-  };
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-
-
-  DataStore.prototype.isStorageKey = function isStorageKey(key) {
-    var leading = this.rootkey == '/' ?
-    // Non-nested stores must have a key based on id
-    keys.join(this.rootkey, this.id) : this.rootkey;
-
-    return key ? key.indexOf(leading.slice(1)) == 0 : false;
-  };
-
-  /**
-   * Retrieve storage version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-
-
-  DataStore.prototype.getStorageKey = function getStorageKey(key) {
-    if (!this.isStorageKey(key)) {
-      key = this.rootkey == '/' ?
-      // Make sure non-nested stores have a key based on id
-      keys.join(this.rootkey, this.id, key) : keys.join(this.rootkey, key);
-      // Remove leading '/'
-      key = key.slice(1);
-    }
-    return key;
-  };
-
-  /**
-   * Retrieve an instance reference at 'key' to a subset of data
-   * @param {String} key
-   * @returns {DataStore}
-   */
-
-
-  DataStore.prototype.createCursor = function createCursor(key) {
-    key = this.getRootKey(key);
-
-    var cursor = this._cursors[key];
-
-    // Create and store
-    if (!cursor) {
-      cursor = Cursor.create(key, this);
-      this._cursors[key] = cursor;
-    }
-
-    return cursor;
-  };
-
-  /**
-   * Store serialisability of 'key'
-   * @param {String} key
-   * @param {Boolean} value
-   */
-
-
-  DataStore.prototype.setSerialisable = function setSerialisable(key, value) {
-    if (this.isRootKey(key)) key = key.slice(1);
-
-    if (isPlainObject(key)) {
-      for (var k in key) {
-        this.setSerialisable(k, value);
-      }
-    }
-
-    this._serialisable[key] = value;
-  };
-
-  /**
-   * Notify listeners
-   * Handles bubbling up parent tree
-   * @param {String} type
-   */
-
-
-  DataStore.prototype.emit = function emit(type) {
-    var _Emitter$prototype$em;
-
-    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-      args[_key - 1] = arguments[_key];
-    }
-
-    // Notify listeners for this store
-    (_Emitter$prototype$em = _Emitter.prototype.emit).call.apply(_Emitter$prototype$em, [this, type].concat(args));
-
-    // Bubble
-    if (this._parent) {
-      var _parent;
-
-      // Update key
-      if (~type.indexOf(':')) {
-        type = type.replace(':', ':' + this.id + '/');
-      } else {
-        args[0] = keys.join(this.id, args[0]);
-      }
-      (_parent = this._parent).emit.apply(_parent, [type].concat(args));
-    }
-  };
+  /*
+    get
+    set
+    load
+    reload
+  
+    bootstrap
+    upgradeStorage
+  */
 
   /**
    * Bootstrap from storage
    */
 
 
-  DataStore.prototype._bootstrap = function _bootstrap() {
+  DataStore.prototype.bootstrap = function bootstrap() {
     if (this._storage) {
       var storageId = this.getStorageKey();
       var data = this._storage.get(storageId);
@@ -297,7 +120,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._get = function _get(key) {
+  DataStore.prototype.get = function get(key) {
     // Return all if no key specified
     if (!key) return this._data;
 
@@ -322,7 +145,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._set = function _set(key, value, options) {
+  DataStore.prototype.set = function set(key, value, options) {
     if (this.isWritable) {
       options = assign({}, DEFAULT_SET_OPTIONS, options);
 
@@ -373,7 +196,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._remove = function _remove(key) {
+  DataStore.prototype.unset = function unset(key) {
     var _this2 = this;
 
     // Remove prop from parent
@@ -409,9 +232,9 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._update = function _update(key, value) {
-    for (var _len2 = arguments.length, args = Array(_len2 > 3 ? _len2 - 3 : 0), _key2 = 3; _key2 < _len2; _key2++) {
-      args[_key2 - 3] = arguments[_key2];
+  DataStore.prototype.update = function update(key, value) {
+    for (var _len = arguments.length, args = Array(_len > 3 ? _len - 3 : 0), _key = 3; _key < _len; _key++) {
+      args[_key - 3] = arguments[_key];
     }
 
     var _this3 = this;
@@ -450,7 +273,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._load = function _load(key, url) {
+  DataStore.prototype.load = function load(key, url) {
     var _this4 = this;
 
     var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
@@ -527,7 +350,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._reload = function _reload(key, url, options) {
+  DataStore.prototype.reload = function reload(key, url, options) {
     var _this5 = this;
 
     // Already expired
@@ -553,7 +376,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._cancelReload = function _cancelReload() {
+  DataStore.prototype.cancelReload = function cancelReload() {
     clock.cancel(this.id);
   };
 
@@ -563,7 +386,7 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._persist = function _persist(key) {
+  DataStore.prototype.persist = function persist(key) {
     if (this._storage) {
       this._storage.set(this.getStorageKey(key), this.toJSON(key));
     }
@@ -575,10 +398,112 @@ var DataStore = function (_Emitter) {
    */
 
 
-  DataStore.prototype._unpersist = function _unpersist(key) {
+  DataStore.prototype.unpersist = function unpersist(key) {
     if (this._storage) {
       this._storage.remove(this.getStorageKey(key));
     }
+  };
+
+  /**
+   * Retrieve an instance reference at 'key' to a subset of data
+   * @param {String} key
+   * @returns {DataStore}
+   */
+
+
+  DataStore.prototype.createCursor = function createCursor(key) {
+    key = this.getRootKey(key);
+
+    var cursor = this._cursors[key];
+
+    // Create and store
+    if (!cursor) {
+      cursor = Cursor.create(key, this);
+      this._cursors[key] = cursor;
+    }
+
+    return cursor;
+  };
+
+  /**
+   * Store serialisability of 'key'
+   * @param {String} key
+   * @param {Boolean} value
+   */
+
+
+  DataStore.prototype.setSerialisable = function setSerialisable(key, value) {
+    if (this.isRootKey(key)) key = key.slice(1);
+
+    if (isPlainObject(key)) {
+      for (var k in key) {
+        this.setSerialisable(k, value);
+      }
+    }
+
+    this._serialisable[key] = value;
+  };
+
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+
+
+  DataStore.prototype.isRootKey = function isRootKey(key) {
+    return key ? key.charAt(0) == '/' : false;
+  };
+
+  /**
+   * Retrieve global version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+
+
+  DataStore.prototype.getRootKey = function getRootKey() {
+    var key = arguments.length <= 0 || arguments[0] === undefined ? '' : arguments[0];
+
+    if (!this.isRootKey(key)) {
+      key = '/' + key;
+    }
+    return key;
+  };
+
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+
+
+  DataStore.prototype.isStorageKey = function isStorageKey(key) {
+    var leading = this.rootkey == '/' ?
+    // Non-nested stores must have a key based on id
+    keys.join(this.rootkey, this.id) : this.rootkey;
+
+    return key ? key.indexOf(leading.slice(1)) == 0 : false;
+  };
+
+  /**
+   * Retrieve storage version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+
+
+  DataStore.prototype.getStorageKey = function getStorageKey(key) {
+    if (!this.isStorageKey(key)) {
+      key = this.rootkey == '/' ?
+      // Make sure non-nested stores have a key based on id
+      keys.join(this.rootkey, this.id, key) : keys.join(this.rootkey, key);
+      // Remove leading '/'
+      key = key.slice(1);
+    }
+    return key;
   };
 
   /**
@@ -626,91 +551,59 @@ var DataStore = function (_Emitter) {
    * @param {String} method
    * @returns {Object|null}
    */
+  // _delegate (method, ...args) {
+  //   const [key] = args;
 
+  //   if (!key) return this[method](...args);
 
-  DataStore.prototype._delegate = function _delegate(method) {
-    var _this6 = this;
+  //   if ('string' == typeof key) {
+  //     const [target, targetKey] = this._getStoreForKey(key);
 
-    for (var _len3 = arguments.length, args = Array(_len3 > 1 ? _len3 - 1 : 0), _key3 = 1; _key3 < _len3; _key3++) {
-      args[_key3 - 1] = arguments[_key3];
-    }
+  //     // Delegate to target if no resolved key
+  //     if (targetKey === '') {
+  //       args = args.slice(1);
+  //       return target._delegate(method, ...args);
+  //     }
 
-    var _args = args;
-    var key = _args[0];
+  //     // Overwrite key
+  //     args[0] = targetKey;
+  //     return target[method](...args);
+  //   }
 
+  //   // Handle batch (set, update, load, etc)
+  //   if (isPlainObject(key)) {
+  //     const add = args.slice(1);
 
-    if (!key) return this[method].apply(this, args);
+  //     for (const k in key) {
+  //       this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
+  //     }
+  //     return;
+  //   }
 
-    if ('string' == typeof key) {
-      var _getStoreForKey2 = this._getStoreForKey(key);
-
-      var target = _getStoreForKey2[0];
-      var targetKey = _getStoreForKey2[1];
-
-      // Delegate to target if no resolved key
-
-      if (targetKey === '') {
-        args = args.slice(1);
-        return target._delegate.apply(target, [method].concat(args));
-      }
-
-      // Overwrite key
-      args[0] = targetKey;
-      return target[method].apply(target, args);
-    }
-
-    // Handle batch (set, update, load, etc)
-    if (isPlainObject(key)) {
-      var add = args.slice(1);
-
-      for (var k in key) {
-        this._delegate.apply(this, add.length ? [method, k, key[k]].concat(add) : [method, k, key[k]]);
-      }
-      return;
-    }
-
-    // Handle array (get)
-    if (Array.isArray(key)) {
-      return key.map(function (k) {
-        // 'get' only accepts 1 arg, so no need to handle additional here
-        return _this6._delegate.call(_this6, method, k);
-      });
-    }
-  };
+  //   // Handle array (get)
+  //   if (Array.isArray(key)) {
+  //     return key.map((k) => {
+  //       // 'get' only accepts 1 arg, so no need to handle additional here
+  //       return this._delegate.call(this, method, k);
+  //     });
+  //   }
+  // }
 
   /**
-   * Destroy instance and dependant children
+   * Destroy instance
    */
 
 
   DataStore.prototype.destroy = function destroy() {
-    // Destroy all dependant children
-    for (var id in this._children) {
-      var child = this._children[id];
-
-      child._parent = null;
-      child._root = child;
-      child.rootkey = '/';
-      // Only destroy dependant children
-      if (child._isDependant) {
-        child.destroy();
-      }
-    }
     // Destroy cursors
     for (var key in this._cursors) {
       this._cursors[key].destroy();
     }
-    this._children = {};
     this._cursors = {};
-    this._childEvents = {};
     this._data = {};
-    this._isDependant = false;
     this._loading = [];
-    this._parent = null;
-    this._root = null;
     this._serialisable = {};
     this._storage = null;
-    this.rootkey = '/';
     this.destroyed = true;
     this.removeAllListeners();
     clock.cancel(this.id);
@@ -719,7 +612,7 @@ var DataStore = function (_Emitter) {
   /**
    * Dump all data, optionally stringified
    * @param {Boolean} stringify
-   * @returns {Object | String}
+   * @returns {Object|String}
    */
 
 
@@ -728,11 +621,6 @@ var DataStore = function (_Emitter) {
 
     for (var prop in this._data) {
       obj[prop] = this._data[prop];
-    }
-
-    // Add child props
-    for (var id in this._children) {
-      obj[id] = this._children[id].dump();
     }
 
     if (stringify) {
@@ -754,21 +642,8 @@ var DataStore = function (_Emitter) {
 
 
   DataStore.prototype.toJSON = function toJSON(key) {
-    if (key) {
-      // Delegate to child if passed child key
-      return this.isChildKey(key) ? this._children[keys.first(key)].toJSON(keys.slice(key, 1)) : this._serialise(key, this.get(key));
-    }
-
-    var obj = this._serialise(null, this._data);
-
-    // Add child props
-    for (var child in this._children) {
-      if (this._serialisable[child] !== false) {
-        obj[child] = this._children[child].toJSON();
-      }
-    }
-
-    return obj;
+    if (key) return this._serialise(key, this.get(key));
+    return this._serialise(null, this._data);
   };
 
   /**
@@ -826,7 +701,6 @@ function getExpiry(timestamp, minimum) {
   : now + minimum;
 }
 
-// Export
 module.exports = DataStore;
 
 /**
