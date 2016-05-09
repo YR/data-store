@@ -16,19 +16,21 @@ const property = require('@yr/property');
 const runtime = require('@yr/runtime');
 const time = require('@yr/time');
 
-const DEFAULT_EXPIRY = 600000;
 const DEFAULT_LATENCY = 10000;
-const DEFAULT_LOAD_RETRY = 3;
-const DEFAULT_LOAD_TIMEOUT = 5000;
+const DEFAULT_LOAD_OPTIONS = {
+  defaultExpiry: 600000,
+  retry: 3,
+  timeout: 5000
+};
+const DEFAULT_STORAGE_MAX_KEY_LENGTH = 2;
 const DEFAULT_SET_OPTIONS = {
   // Browser immutable by default
   immutable: runtime.isBrowser,
-  reference: false,
   reload: false,
   serialisable: true,
   merge: true
 };
-const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'load', 'reload', 'persist', 'unpersist'];
+const DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload'];
 let uid = 0;
 
 class DataStore extends Emitter {
@@ -37,6 +39,18 @@ class DataStore extends Emitter {
    * @param {String} [id]
    * @param {Object} [data]
    * @param {Object} [options]
+   *  - handlers {Object} method:key
+   *  - loading {Object}
+   *    - defaultExpiry {Number}
+   *    - reloadKeys {Array}
+   *    - retry {Number}
+   *    - timeout {Number}
+   *  - serialisable {Object} key:Boolean
+   *  - storage {Object}
+   *    - maxKeyLength {Number}
+   *    - persistentKeys {Array}
+   *    - store {Object}
+   *  - writable {Boolean}
    */
   constructor (id, data = {}, options = {}) {
     super();
@@ -44,18 +58,21 @@ class DataStore extends Emitter {
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${--uid}`;
-    this.isWritable = 'isWritable' in options ? options.isWritable : true;
+    this.writable = 'writable' in options ? options.writable : true;
 
     this._cursors = {};
     this._data = data;
     this._handlers = options.handlers;
-    this._loading = [];
-    this._minExpiry = 'defaultExpiry' in options ? options.defaultExpiry : DEFAULT_EXPIRY;
-    this._retry = 'retry' in options ? options.retry : DEFAULT_LOAD_RETRY;
-    this._shouldReload = options.reload;
+    this._links = {};
+    this._loading = assign({
+      active: {},
+      reloadKeys: []
+    }, DEFAULT_LOAD_OPTIONS, options.loading);
     this._serialisable = options.serialisable || {};
-    this._storage = options.storage;
-    this._timeout = 'timeout' in options ? options.timeout : DEFAULT_LOAD_TIMEOUT;
+    this._storage = assign({
+      maxKeyLength: DEFAULT_STORAGE_MAX_KEY_LENGTH,
+      persistentKeys: []
+    }, options.storage);
 
     for (const method of DELEGATED_METHODS) {
       const privateMethod = `_${method}`;
@@ -81,9 +98,18 @@ class DataStore extends Emitter {
    * @returns {String}
    */
   getRootKey (key = '') {
-    if (!this.isRootKey(key)) {
-      key = `/${key}`;
-    }
+    if (!this.isRootKey(key)) key = `/${key}`;
+    return key;
+  }
+
+  /**
+   * Retrieve global version of 'key',
+   * taking account of nested status.
+   * @param {String} key
+   * @returns {String}
+   */
+  getStorageKey (key = '') {
+    if (keys.length(key) > this._storage.maxKeyLength) key = keys.slice(key, 0, this._storage.maxKeyLength);
     return key;
   }
 
@@ -101,7 +127,11 @@ class DataStore extends Emitter {
     if ('string' == typeof key) {
       if (key.charAt(0) == '/') key = key.slice(1);
 
+      // Handle links
+      if (key in this._links) key = this._links[key];
+
       const handler = keys.first(key);
+      // Remove leading '_'
       const publicMethod = method.slice(1);
 
       // Route to handler if it exists
@@ -119,7 +149,7 @@ class DataStore extends Emitter {
       return;
     }
 
-    // Array of keys (get)
+    // Array of keys (get, load)
     if (Array.isArray(key)) {
       return key.map((k) => {
         return this._route(method, k, ...rest);
@@ -139,11 +169,10 @@ class DataStore extends Emitter {
     const value = property.get(key, this._data);
 
     // Check expiry
-    if (value && value.expires && time.now() > value.expires) {
-      value.expired = true;
-      value.expires = 0;
-      this.debug('WARNING data has expired "%s"', value.__ref || key);
-      // TODO: load if not reloading?
+    if (Array.isArray(value)) {
+      value.forEach(this._checkExpiry, this);
+    } else {
+      this._checkExpiry(value);
     }
 
     return value;
@@ -154,29 +183,28 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {Object} value
    * @param {Object} [options]
+   *  - immutable {Boolean}
+   *  - reload {Boolean}
+   *  - serialisable {Boolean}
+   *  - merge {Boolean}
    * @returns {Object}
    */
   _set (key, value, options) {
-    if (this.isWritable) {
+    if (this.writable) {
       options = assign({}, DEFAULT_SET_OPTIONS, options);
 
-      // Handle replacing underlying data store
+      // Handle replacing underlying data
       if (key == null && isPlainObject(value)) {
         this.debug('reset');
         this._data = value;
         return;
       }
-
       // Handle removal of key
       if ('string' == typeof key && value == null) return this._unset(key);
 
-      // Store serialisability if not serialisable
-      if (!options.serialisable) {
-        this.setSerialisable(key, options.serialisable);
-      }
+      // Store serialisability
+      if ('serialisable' in options) this.setSerialisable(key, options.serialisable);
 
-      // Write reference key
-      if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
       if (options.immutable) {
         // Returns null if no change
         const newData = property.set(key, value, this._data, options);
@@ -191,10 +219,11 @@ class DataStore extends Emitter {
       }
 
       // Handle persistence
-      if (options.persistent) {
-        // Store parent object if setting simple value
-        if (keys.length(key) > 1) key = keys.first(key);
-        this.persist(key);
+      // Allow options to override global config
+      if ('persistent' in options && options.persistent
+        || ~this._storage.persistentKeys.indexOf(key)
+        || ~this._storage.persistentKeys.indexOf(keys.first(key))) {
+          this._persist(key);
       }
     }
 
@@ -211,14 +240,24 @@ class DataStore extends Emitter {
     const k = (length == 1) ? key : keys.last(key);
     const data = (length == 1) ? this._data : this._get(keys.slice(key, 0, -1));
 
-    // Only remove existing props
-    // Prevent recursive trap
+    // Only remove existing (prevent recursive trap)
     if (data && k in data) {
       const oldValue = data[k];
 
       this.debug('unset "%s"', key);
       delete data[k];
-      this.unpersist(key);
+      // Prune dead links
+      for (const toKey in this._links) {
+        if (this._links[toKey] == key) {
+          delete this._links[toKey];
+        }
+      }
+
+      // Prune from storage
+      if (~this._storage.persistentKeys.indexOf(key)
+        || ~this._storage.persistentKeys.indexOf(keys.first(key))) {
+          this._unpersist(key);
+      }
 
       // Delay to prevent race condition (view render)
       clock.immediate(() => {
@@ -234,22 +273,21 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {Object} value
    * @param {Object} options
+   *  - immutable {Boolean}
+   *  - reference {Boolean}
+   *  - reload {Boolean}
+   *  - serialisable {Boolean}
+   *  - merge {Boolean}
    */
   _update (key, value, options = {}, ...args) {
-    if (this.isWritable) {
-      // Handle reference keys
-      // Use reference key to write to original object
-      const parent = this.get(keys.slice(key, 0, -1));
-
-      if (parent && parent.__ref) key = keys.join(parent.__ref, keys.last(key));
-
+    if (this.writable) {
       this.debug('update %s', key);
       const oldValue = this.get(key);
 
       options.immutable = true;
       this.set(key, value, options);
 
-      // Delay to prevent race condition (view render)
+      // Delay to prevent race condition
       clock.immediate(() => {
         this.emit('update:' + key, value, oldValue, options, ...args);
         this.emit('update', key, value, oldValue, options, ...args);
@@ -258,24 +296,43 @@ class DataStore extends Emitter {
   }
 
   /**
+   * Create link between 'fromKey' and 'toKey' keys
+   * @param {String} fromKey
+   * @param {String} toKey
+   * @returns {Object}
+   */
+  _link (fromKey, toKey) {
+    this._links[toKey] = fromKey;
+    return this.get(fromKey);
+  }
+
+  /**
    * Load data from 'url' and store at 'key'
    * @param {String} key
    * @param {String} url
    * @param {Object} [options]
+   *  - abort {Boolean}
+   *  - ignoreQuery {Boolean}
+   *  - immutable {Boolean}
+   *  - isReload {Boolean}
+   *  - reference {Boolean}
+   *  - reload {Boolean}
+   *  - serialisable {Boolean}
+   *  - merge {Boolean}
    * @returns {Response}
    */
   _load (key, url, options = {}) {
     const req = agent.get(url, options);
 
-    if (!~this._loading.indexOf(key)) {
+    if (!this._loading.active[key]) {
       this.debug('load %s from %s', key, url);
 
-      this._loading.push(key);
+      this._loading.active[key] = true;
 
-      req.timeout(this._timeout)
-        .retry(this._retry)
+      req.timeout(this._loading.timeout)
+        .retry(this._loading.retry)
         .end((err, res) => {
-          this._loading.splice(this._loading.indexOf(key), 1);
+          delete this._loading.active[key];
 
           if (err) {
             this.debug('remote resource "%s" not found at %s', key, url);
@@ -296,7 +353,7 @@ class DataStore extends Emitter {
 
               // Add expires header
               if (res.headers && 'expires' in res.headers) {
-                expires = getExpiry(res.headers.expires, this._minExpiry);
+                expires = getExpiry(res.headers.expires, this._loading.defaultExpiry);
 
                 if (Array.isArray(data)) {
                   data.forEach((d) => {
@@ -310,7 +367,6 @@ class DataStore extends Emitter {
                   data.expired = false;
                 }
               }
-              options.merge = true;
               value = this.set(key, data, options);
             }
 
@@ -323,7 +379,11 @@ class DataStore extends Emitter {
           }
 
           // Allow options to override global config
-          if ('reload' in options ? options.reload : this._shouldReload) this._reload(key, url, options);
+          if ('reload' in options && options.reload
+            || ~this._loading.reloadKeys.indexOf(key)
+            || ~this._loading.reloadKeys.indexOf(keys.first(key))) {
+              this._reload(key, url, options);
+          }
         });
     }
 
@@ -335,6 +395,14 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {String} url
    * @param {Object} [options]
+   *  - abort {Boolean}
+   *  - ignoreQuery {Boolean}
+   *  - immutable {Boolean}
+   *  - isReload {Boolean}
+   *  - reference {Boolean}
+   *  - reload {Boolean}
+   *  - serialisable {Boolean}
+   *  - merge {Boolean}
    * @returns {null}
    */
   _reload (key, url, options) {
@@ -344,23 +412,21 @@ class DataStore extends Emitter {
     let duration = (this.get(`${key}/expires`) || 0) - time.now();
 
     // Guard against invalid duration (reload on error with old or missing expiry, etc)
-    if (duration <= 0) duration = this._minExpiry;
+    if (duration <= 0) duration = this._loading.defaultExpiry;
 
     options = assign({}, options, { isReload: true });
     this.debug('reloading "%s" in %dms', key, duration);
     clock.timeout(duration, () => {
       this.load(key, url, options);
-    // Set custom id
-    // Only one key will be reloaded at a time,
-    // and any outstanding timers will be cancelled
-    }, this.id);
+    }, key);
   }
 
   /**
    * Cancel any existing reload timeouts
+   * @param {String} key
    */
-  cancelReload () {
-    clock.cancel(this.id);
+  _cancelReload (key) {
+    clock.cancel(key);
   }
 
   /**
@@ -368,8 +434,9 @@ class DataStore extends Emitter {
    * @param {String} key
    */
   _persist (key) {
-    if (this._storage) {
-      this._storage.set(this.getStorageKey(key), this.toJSON(key));
+    if (this._storage.store) {
+      key = this.getStorageKey(key);
+      this._storage.store.set(key, this.toJSON(key));
     }
   }
 
@@ -378,8 +445,8 @@ class DataStore extends Emitter {
    * @param {String} key
    */
   _unpersist (key) {
-    if (this._storage) {
-      this._storage.remove(this.getStorageKey(key));
+    if (this._storage.store) {
+      this._storage.store.remove(this.getStorageKey(key));
     }
   }
 
@@ -430,9 +497,10 @@ class DataStore extends Emitter {
     this._cursors = {};
     this._data = {};
     this._handlers = {};
-    this._loading = [];
+    this._links = {};
+    this._loading = {};
     this._serialisable = {};
-    this._storage = null;
+    this._storage = {};
     this.destroyed = true;
     this.removeAllListeners();
     clock.cancel(this.id);
@@ -507,6 +575,16 @@ class DataStore extends Emitter {
       : null;
   }
 
+  /**
+   * Check if 'value' is expired
+   * @param {Object} value
+   */
+  _checkExpiry (value) {
+    if (value && value.expires && time.now() > value.expires) {
+      value.expired = true;
+      value.expires = 0;
+    }
+  }
 
 
 
@@ -514,60 +592,28 @@ class DataStore extends Emitter {
    * Bootstrap from storage
    */
   bootstrap () {
-    if (this._storage) {
-      const storageId = this.getStorageKey();
-      let data = this._storage.get(storageId);
-      let options = {
-        immutable: false,
-        persistent: false
-      };
+    // if (this._storage.store) {
+    //   const storageId = this.getStorageKey();
+    //   let data = this._storage.get(storageId);
+    //   let options = {
+    //     immutable: false,
+    //     persistent: false
+    //   };
 
-      // Invalidate on version mismatch
-      if (this._storage.shouldUpgrade(storageId)) {
-        data = this._upgradeStorage(data);
-        options.persistent = true;
-      }
+    //   // Invalidate on version mismatch
+    //   if (this._storage.shouldUpgrade(storageId)) {
+    //     data = this._upgradeStorage(data);
+    //     options.persistent = true;
+    //   }
 
-      for (const key in data) {
-        // Remove prefix
-        const k = keys.slice(key, 1);
+    //   for (const key in data) {
+    //     // Remove prefix
+    //     const k = keys.slice(key, 1);
 
-        // Treat as batch if no key
-        this.set(!k ? null : k, data[key], options);
-      }
-    }
-  }
-
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isStorageKey (key) {
-    const leading = (this.rootkey == '/')
-      // Non-nested stores must have a key based on id
-      ? keys.join(this.rootkey, this.id)
-      : this.rootkey;
-
-    return key ? (key.indexOf(leading.slice(1)) == 0) : false;
-  }
-
-  /**
-   * Retrieve storage version of 'key',
-   * taking account of nested status.
-   * @param {String} key
-   * @returns {String}
-   */
-  getStorageKey (key) {
-    if (!this.isStorageKey(key)) {
-      key = (this.rootkey == '/')
-        // Make sure non-nested stores have a key based on id
-        ? keys.join(this.rootkey, this.id, key)
-        : keys.join(this.rootkey, key);
-      // Remove leading '/'
-      key = key.slice(1);
-    }
-    return key;
+    //     // Treat as batch if no key
+    //     this.set(!k ? null : k, data[key], options);
+    //   }
+    // }
   }
 
   /**

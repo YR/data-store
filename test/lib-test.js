@@ -7,32 +7,25 @@ const time = require('@yr/time');
 
 const storage = {
   _storage: {},
-
   init () {
     this._storage = {};
   },
-
   get (key) {
-    return { [key]: this._storage[key] };
+    return this._storage[key];
   },
-
   set (key, value) {
     this._storage[key] = value;
   },
-
   remove (key) {
     delete this._storage[key];
   },
-
   clear () {
     this._storage = {};
   },
-
   shouldUpgrade (key) {
     return false;
   }
 };
-
 let fake, store;
 
 describe('dataStore', function () {
@@ -51,7 +44,14 @@ describe('dataStore', function () {
         }
       },
       bat: ['foo', 'bar']
-    }, { defaultExpiry: 1000 });
+    }, {
+      loading: {
+        defaultExpiry: 1000
+      },
+      storage: {
+        store: storage
+      }
+    });
   });
   afterEach(function () {
     storage.clear();
@@ -67,7 +67,7 @@ describe('dataStore', function () {
       store = Store.create('foo');
       expect(store.id).to.equal('foo');
     });
-    it.skip('should instantiate with storage data', function (done) {
+    it.only('should instantiate with storage data', function (done) {
       storage.set('foo', { bar: 'bar' });
       setTimeout(() => {
         store = Store.create('foo', null, { bootstrap: true, persistent: { storage } });
@@ -108,7 +108,7 @@ describe('dataStore', function () {
       expect(c.get('bing')).to.have.property('expired', true);
       expect(c.get('bing')).to.have.property('expires', 0);
     });
-    it('should handle simple delegation', function () {
+    it('should handle delegation', function () {
       store._handlers = {
         get: {
           foo: function (store, get, key) {
@@ -126,36 +126,6 @@ describe('dataStore', function () {
     });
     it('should modify an existing local key', function () {
       expect(store.getRootKey('foo')).to.equal('/foo');
-    });
-  });
-
-  describe.skip('isStorageKey()', function () {
-    it('should return "true" for key with leading id', function () {
-      expect(store.isStorageKey('store/foo')).to.be(true);
-    });
-    it('should return "false" for key without leading id', function () {
-      expect(store.isRootKey('foo')).to.be(false);
-    });
-    it('should return "true" for key of a child store', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-
-      store.addStore(c);
-      expect(c.isStorageKey('zing/bing')).to.be(true);
-    });
-  });
-
-  describe.skip('getStorageKey()', function () {
-    it('should not modify a valid key', function () {
-      expect(store.getStorageKey('store/foo')).to.equal('store/foo');
-    });
-    it('should modify an existing local key', function () {
-      expect(store.getStorageKey('foo')).to.equal('store/foo');
-    });
-    it('should modify an existing local key of a child store', function () {
-      const c = Store.create('zing', { bing: 'bong' });
-
-      store.addStore(c);
-      expect(c.getStorageKey('bing')).to.equal('zing/bing');
     });
   });
 
@@ -192,7 +162,7 @@ describe('dataStore', function () {
       expect(store._data.zing.bing).to.equal('bar');
     });
     it('should do nothing if dataStore is not writable', function () {
-      store.isWritable = false;
+      store.writable = false;
       store.set('foo', 'bar');
       expect(store._data.foo).to.not.equal('bar');
     });
@@ -201,10 +171,6 @@ describe('dataStore', function () {
 
       store.set(null, obj);
       expect(store._data).to.eql(obj);
-    });
-    it('should return an object with "__ref" property when called with "options.reference"', function () {
-      store.set('boo', { bar: 'bar' }, { reference: true });
-      expect(store._data.boo).to.have.property('__ref', '/boo');
     });
     it('should remove a key when null value specified', function () {
       store.set('foo/boo', null);
@@ -216,16 +182,26 @@ describe('dataStore', function () {
       store.set('a', null);
       expect(store.get()).to.not.have.property('a');
     });
-    it.skip('should persist data to storage', function (done) {
-      store._storage = storage;
+    it('should persist data to storage with "options.persistent"', function (done) {
       store.set('bar', 'foo', { persistent: true });
-      store.set('foo/bar', { bat: 'boo' }, { persistent: true });
       setTimeout(() => {
-        expect(storage.get('store/bar')).to.have.property('store/bar', 'foo');
-        expect(storage.get('store/foo')).to.have.property('store/foo').eql({
-          bar: { bat: 'boo' },
-          boo: { bar: 'foo' }
-        });
+        expect(storage.get('bar')).to.equal('foo');
+        done();
+      }, 100);
+    });
+    it('should persist data to storage with config "persistentKeys"', function (done) {
+      store._storage.persistentKeys = ['foo'];
+      store.set('foo/bar', { bat: 'boo' });
+      setTimeout(() => {
+        expect(storage.get('foo/bar')).to.have.property('bat', 'boo');
+        done();
+      }, 100);
+    });
+    it('should persist deeply nested data to storage', function (done) {
+      store._storage.persistentKeys = ['foo'];
+      store.set('foo/bing/bong/boop', 'boop');
+      setTimeout(() => {
+        expect(storage.get('foo/bing').bong).to.have.property('boop', 'boop');
         done();
       }, 100);
     });
@@ -253,27 +229,10 @@ describe('dataStore', function () {
     });
   });
 
-  describe('emit()', function () {
-    it('should notify listeners', function (done) {
-      store.on('update', (key) => {
-        expect(key).to.be('foo');
-        done();
-      });
-      store.emit('update', 'foo');
-    });
-  });
-
   describe('update()', function () {
     it('should set a value for "key"', function () {
       store.update('bar', 'bar');
       expect(store.get('bar')).to.equal('bar');
-    });
-    it('should write to originally referenced objects if "__ref"', function () {
-      store.set('a', { aa: 'aa' }, { reference: true });
-      store.set('b', store.get('a'));
-      store.update('b/bb', 'bb');
-      expect(store.get('a')).to.have.property('bb', 'bb');
-      expect(store.get('b')).to.not.have.property('bb');
     });
     it('should allow batch writes', function () {
       store.update({ bar: 'bar', foo: 'bar' });
@@ -316,10 +275,53 @@ describe('dataStore', function () {
       });
       store.update(obj, undefined, 'foo');
     });
-    it('should be ignored if dataStore is not "isWritable"', function () {
-      store.isWritable = false;
+    it('should be ignored if dataStore is not "writable"', function () {
+      store.writable = false;
       store.update('bar', 'bar');
       expect(store.get('bar')).to.not.equal('bar');
+    });
+  });
+
+  describe('link()', function () {
+    it('should create a get()-able property', function () {
+      const value = store.link('bar', 'beep');
+
+      expect(value).to.equal('bat');
+      expect(store.get('beep')).to.equal('bat');
+    });
+    it('should create a set()-able property', function () {
+      const value = store.link('bar', 'beep');
+
+      store.set('beep', 'foo');
+      expect(value).to.equal('bat');
+      expect(store._links.beep).to.equal('bar');
+      expect(store._data.bar).to.equal('foo');
+    });
+    it('should create an unset()-able property', function () {
+      const value = store.link('bar', 'beep');
+
+      store.unset('beep');
+      expect(value).to.equal('bat');
+      expect(store._links.beep).to.equal(undefined);
+      expect(store._data.bar).to.equal(undefined);
+    });
+    it('should create an update()-able property', function () {
+      const value = store.link('bar', 'beep');
+
+      store.update('beep', 'foo');
+      expect(value).to.equal('bat');
+      expect(store._links.beep).to.equal('bar');
+      expect(store._data.bar).to.equal('foo');
+    });
+  });
+
+  describe('emit()', function () {
+    it('should notify listeners', function (done) {
+      store.on('update', (key) => {
+        expect(key).to.be('foo');
+        done();
+      });
+      store.emit('update', 'foo');
     });
   });
 
@@ -346,14 +348,15 @@ describe('dataStore', function () {
       fake
         .get('/foo')
         .reply(200, { foo: 'foo' });
-      store.load('foo', 'http://localhost/foo', { reference: true })
+      store.load('foo', 'http://localhost/foo', { serialisable: false })
         .end((err, res) => {
           if (err) done(err);
-          expect(store.get('foo').__ref).to.eql('/foo');
+          expect(store.get('foo').foo).to.eql('foo');
+          expect(store._serialisable.foo).to.equal(false);
           done();
         });
     });
-    it('should reload "key" after expiry with "optionstore.reload = true"', function (done) {
+    it('should reload "key" after expiry with "options.reload = true"', function (done) {
       fake
         .get('/foo')
         .reply(200, { foo: 'foo' }, { expires: 0 })
@@ -369,13 +372,13 @@ describe('dataStore', function () {
           }, 1200);
         });
     });
-    it('should reload "key" after expiry with config "reload = true"', function (done) {
+    it('should reload "key" after expiry with config "reloadKeys"', function (done) {
       nock('http://localhost')
         .get('/foo')
         .reply(200, { foo: 'foo' }, { expires: 0 })
         .get('/foo')
         .reply(200, { foo: 'bar' });
-      store._shouldReload = true;
+      store._loading.reloadKeys = ['foo'];
       store.load('foo', 'http://localhost/foo', { merge: false })
         .end((err, res) => {
           if (err) done(err);
@@ -386,42 +389,13 @@ describe('dataStore', function () {
           }, 1200);
         });
     });
-    it('should cancel existing reload of "key" when loading new "key"', function (done) {
-      fake
-        .get('/foo')
-        .reply(200, { foo: 'foo' }, { expires: 0 })
-        .get('/foo')
-        .reply(200, { foo: 'bar' })
-        .get('/bar')
-        .reply(200, { bar: 'bar' }, { expires: 0 });
-      store._shouldReload = true;
-      store.load('foo', 'http://localhost/foo', { merge: false })
-        .end((err, res) => {
-          if (err) done(err);
-          expect(store.get('foo')).to.have.property('foo', 'foo');
-
-          setTimeout(() => {
-            store.load('bar', 'http://localhost/bar', { merge: false })
-              .end((err, res) => {
-                if (err) done(err);
-                expect(store.get('foo')).to.have.property('foo', 'foo');
-                expect(store.get('bar')).to.have.property('bar', 'bar');
-
-                setTimeout(() => {
-                  expect(store.get('foo')).to.have.property('foo', 'foo');
-                  done();
-                }, 1200);
-              });
-          }, 10);
-        });
-    });
     it('should reload "key" after load error or no expiry when config "reload = true"', function (done) {
       fake
         .get('/foo')
         .reply(500)
         .get('/foo')
         .reply(200, { foo: 'bar' });
-      store._shouldReload = true;
+      store._loading.reloadKeys = ['foo'];
       store.load('foo', 'http://localhost/foo', { merge: false })
         .end((err, res) => {
           expect(err.status).to.equal(500);
@@ -438,7 +412,7 @@ describe('dataStore', function () {
       nock('http://localhost')
         .get('/foo')
         .reply(200, { foo: 'bar' });
-      expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' }});
+      expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
       store.set('foo/expired', true);
       store.reload('foo', 'http://localhost/foo');
       setTimeout(() => {
@@ -450,7 +424,7 @@ describe('dataStore', function () {
       nock('http://localhost')
         .get('/foo')
         .reply(200, { foo: 'bar' });
-      expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' }});
+      expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
       store.set('foo/expires', 1000);
       store.reload('foo', 'http://localhost/foo');
       setTimeout(() => {
