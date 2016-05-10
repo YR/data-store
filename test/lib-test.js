@@ -11,7 +11,14 @@ const storage = {
     this._storage = {};
   },
   get (key) {
-    return this._storage[key];
+    return Object.keys(this._storage)
+      .filter((k) => {
+        return (k.indexOf(key) == 0);
+      })
+      .reduce((data, k) => {
+        data[k] = this._storage[k];
+        return data;
+      }, {});
   },
   set (key, value) {
     this._storage[key] = value;
@@ -59,7 +66,7 @@ describe('dataStore', function () {
   });
 
   describe('constructor', function () {
-    it('should instantiate with default values set', function () {
+    it('should instantiate with passed data', function () {
       expect(store._data).to.have.property('bar', 'bat');
       expect(store.get).to.be.a.Function;
     });
@@ -67,25 +74,44 @@ describe('dataStore', function () {
       store = Store.create('foo');
       expect(store.id).to.equal('foo');
     });
-    it.only('should instantiate with storage data', function (done) {
-      storage.set('foo', { bar: 'bar' });
-      setTimeout(() => {
-        store = Store.create('foo', null, { bootstrap: true, persistent: { storage } });
-        store._bootstrap();
-        expect(store._data).to.eql({ bar: 'bar' });
-        expect(storage.get('foo')).to.eql({ foo: { bar: 'bar' }});
-        done();
-      }, 100);
+    it('should instantiate with storage data', function () {
+      storage.set('foo/bar', { boo: 'bat' });
+      const s = Store.create('foo', null, { storage: { store: storage, namespaces: ['foo'] } });
+
+      expect(s._data).to.eql({ foo: { bar: { boo: 'bat' } } });
+      expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'bat' } });
     });
-    it.skip('should instantiate with complex storage data', function (done) {
-      storage.set('foo/bar', 'bar');
-      setTimeout(() => {
-        store = Store.create('foo', null, { bootstrap: true, persistent: { storage }});
-        store._bootstrap();
-        expect(store._data).to.eql({ bar: 'bar' });
-        expect(storage.get('foo')).to.eql({ 'foo/bar': 'bar' });
-        done();
-      }, 100);
+    it('should instantiate with storage data and passed data', function () {
+      storage.set('foo/bar', { boo: 'bat' });
+      const s = Store.create('foo', { foo: { bat: 'boo' }, bar: 'bar' }, { storage: { store: storage, namespaces: ['foo'] } });
+
+      expect(s._data).to.eql({ foo: { bar: { boo: 'bat' }, bat: 'boo' }, bar: 'bar' });
+      expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'bat' }, 'foo/bat': 'boo' });
+    });
+    it('should instantiate with storage data, upgrading if necessary', function () {
+      storage.shouldUpgrade = function (key) { return true; };
+      storage.set('foo/bar', { boo: 'bat' });
+      const s = Store.create('foo', null, { storage: { store: storage, namespaces: ['foo'] } });
+
+      expect(s._data).to.eql({ });
+      expect(storage.get('foo')).to.eql({ });
+    });
+    it('should instantiate with storage data, upgrading via delegate if necessary', function () {
+      storage.shouldUpgrade = function (key) { return true; };
+      storage.set('foo/bar', { boo: 'bat' });
+      const s = Store.create('foo', null, {
+        handlers: {
+          upgradeStorageData: {
+            foo: function (key, value) {
+              return 'boo';
+            }
+          }
+        },
+        storage: { store: storage, namespaces: ['foo'] }
+      });
+
+      expect(s._data).to.eql({ foo: { bar: 'boo' } });
+      expect(storage.get('foo')).to.eql({ 'foo/bar': 'boo' });
     });
   });
 
@@ -182,28 +208,19 @@ describe('dataStore', function () {
       store.set('a', null);
       expect(store.get()).to.not.have.property('a');
     });
-    it('should persist data to storage with "options.persistent"', function (done) {
+    it('should persist data to storage with "options.persistent"', function () {
       store.set('bar', 'foo', { persistent: true });
-      setTimeout(() => {
-        expect(storage.get('bar')).to.equal('foo');
-        done();
-      }, 100);
+      expect(storage.get('bar')).to.eql({ bar: 'foo' });
     });
-    it('should persist data to storage with config "persistentKeys"', function (done) {
-      store._storage.persistentKeys = ['foo'];
+    it('should persist data to storage with config "persistentKeys"', function () {
+      store._storage.namespaces = ['foo'];
       store.set('foo/bar', { bat: 'boo' });
-      setTimeout(() => {
-        expect(storage.get('foo/bar')).to.have.property('bat', 'boo');
-        done();
-      }, 100);
+      expect(storage.get('foo/bar')).to.have.property('foo/bar').eql({ bat: 'boo' });
     });
-    it('should persist deeply nested data to storage', function (done) {
-      store._storage.persistentKeys = ['foo'];
+    it('should persist deeply nested data to storage', function () {
+      store._storage.namespaces = ['foo'];
       store.set('foo/bing/bong/boop', 'boop');
-      setTimeout(() => {
-        expect(storage.get('foo/bing').bong).to.have.property('boop', 'boop');
-        done();
-      }, 100);
+      expect(storage.get('foo/bing')).to.have.property('foo/bing').eql({ bong: { boop: 'boop' } });
     });
   });
 
@@ -378,7 +395,7 @@ describe('dataStore', function () {
         .reply(200, { foo: 'foo' }, { expires: 0 })
         .get('/foo')
         .reply(200, { foo: 'bar' });
-      store._loading.reloadKeys = ['foo'];
+      store._loading.namespaces = ['foo'];
       store.load('foo', 'http://localhost/foo', { merge: false })
         .end((err, res) => {
           if (err) done(err);
@@ -395,7 +412,7 @@ describe('dataStore', function () {
         .reply(500)
         .get('/foo')
         .reply(200, { foo: 'bar' });
-      store._loading.reloadKeys = ['foo'];
+      store._loading.namespaces = ['foo'];
       store.load('foo', 'http://localhost/foo', { merge: false })
         .end((err, res) => {
           expect(err.status).to.equal(500);
@@ -434,7 +451,7 @@ describe('dataStore', function () {
     });
   });
 
-  describe.skip('cursors', function () {
+  describe('cursors', function () {
     describe('createCursor()', function () {
       it('should generate a cursor instance', function () {
         const cursor = store.createCursor();
@@ -474,21 +491,12 @@ describe('dataStore', function () {
 
         expect(cursor2.get('/bat')).to.equal('zip');
       });
-      it('should allow access to root properties from a cursor of a child store', function () {
-        const c = Store.create('zing', { foo: 'bar' });
-
-        store.addStore(c);
-        store.set('bat', 'zip');
-        const cursor1 = c.createCursor('foo');
-
-        expect(cursor1.get('/bat')).to.equal('zip');
-      });
       it('should access updated data after update to store', function () {
         const cursor = store.createCursor('foo');
 
         expect(cursor.get()).to.equal(store.get('foo'));
         store.set('foo', 'bar');
-        expect(cursor.get()).to.equal(store.get('foo'));
+        expect(cursor.get()).to.equal('bar');
       });
     });
 
@@ -499,19 +507,18 @@ describe('dataStore', function () {
         cursor.update('bar', 'bar');
         expect(store.get('foo/bar')).to.equal('bar');
       });
-      it('should write to originally referenced objects if "__ref"', function () {
-        store.set('zing', { zang: 'zang' }, { reference: true });
-        store.set('zung', store.get('zing'));
-        const cursor = store.createCursor('zung');
-
-        cursor.update('bar', 'bar');
-        expect(store.get('zing')).to.have.property('bar', 'bar');
-      });
       it('should set a root value for empty "key" of a cursor', function () {
         const cursor = store.createCursor('foo');
 
         cursor.update(null, { bar: 'bar' });
         expect(store.get('foo/bar')).to.equal('bar');
+      });
+      it('should remove a cursor key when null value specified', function () {
+        const cursor = store.createCursor('foo');
+
+        cursor.update();
+        expect(store.get('foo/bar')).to.equal(null);
+        expect(store._data).to.not.have.property('foo');
       });
       it('should allow batch writes', function () {
         const cursor = store.createCursor('foo/boo');

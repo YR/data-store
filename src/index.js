@@ -1,8 +1,11 @@
-'use strict';
-
 /**
- *
+ * A clever data object
+ * https://github.com/yr/data-store
+ * @copyright Yr
+ * @license MIT
  */
+
+'use strict';
 
 const agent = require('@yr/agent');
 const assign = require('object-assign');
@@ -22,7 +25,7 @@ const DEFAULT_LOAD_OPTIONS = {
   retry: 3,
   timeout: 5000
 };
-const DEFAULT_STORAGE_MAX_KEY_LENGTH = 2;
+const DEFAULT_STORAGE_KEY_LENGTH = 2;
 const DEFAULT_SET_OPTIONS = {
   // Browser immutable by default
   immutable: runtime.isBrowser,
@@ -30,8 +33,19 @@ const DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
-const DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload'];
+const DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'upgradeStorageData'];
 let uid = 0;
+
+/**
+ * Instance factory
+ * @param {String} [id]
+ * @param {Object} [data]
+ * @param {Object} [options]
+ * @returns {DataStore}
+ */
+exports.create = function create (id, data, options) {
+  return new DataStore(id, data, options);
+};
 
 class DataStore extends Emitter {
   /**
@@ -42,13 +56,13 @@ class DataStore extends Emitter {
    *  - handlers {Object} method:key
    *  - loading {Object}
    *    - defaultExpiry {Number}
-   *    - reloadKeys {Array}
+   *    - namespaces {Array}
    *    - retry {Number}
    *    - timeout {Number}
    *  - serialisable {Object} key:Boolean
    *  - storage {Object}
-   *    - maxKeyLength {Number}
-   *    - persistentKeys {Array}
+   *    - keyLength {Number}
+   *    - namespaces {Array}
    *    - store {Object}
    *  - writable {Boolean}
    */
@@ -61,17 +75,17 @@ class DataStore extends Emitter {
     this.writable = 'writable' in options ? options.writable : true;
 
     this._cursors = {};
-    this._data = data;
+    this._data = {};
     this._handlers = options.handlers;
     this._links = {};
     this._loading = assign({
       active: {},
-      reloadKeys: []
+      namespaces: []
     }, DEFAULT_LOAD_OPTIONS, options.loading);
     this._serialisable = options.serialisable || {};
     this._storage = assign({
-      maxKeyLength: DEFAULT_STORAGE_MAX_KEY_LENGTH,
-      persistentKeys: []
+      keyLength: DEFAULT_STORAGE_KEY_LENGTH,
+      namespaces: []
     }, options.storage);
 
     for (const method of DELEGATED_METHODS) {
@@ -80,6 +94,42 @@ class DataStore extends Emitter {
       this[method] = this._route.bind(this, privateMethod);
       this[privateMethod] = this[privateMethod].bind(this);
     }
+
+    this.bootstrap(this._storage, data);
+  }
+
+  /**
+   * Bootstrap from 'storage' and/or 'data'
+   * @param {Object} storage
+   * @param {Object} data
+   */
+  bootstrap (storage, data) {
+    // Bootstrap data
+    const bootstrapOptions = { immutable: false };
+
+    if (storage.store) {
+      const { namespaces, store } = storage;
+      const storageData = namespaces.reduce((accumulatedStorageData, namespace) => {
+        let storageData = store.get(namespace);
+
+        // Handle version mismatch
+        if (store.shouldUpgrade(namespace)) {
+          for (const key in storageData) {
+            store.remove(key);
+            // Allow handlers to override
+            storageData[key] = this.upgradeStorageData(key, storageData[key]);
+          }
+        }
+
+        return assign(accumulatedStorageData, storageData);
+      }, {});
+
+      this.set(storageData, null, bootstrapOptions);
+      // Flatten data to force key length
+      data = property.flatten(data, this._storage.keyLength);
+    }
+
+    this.set(data, null, bootstrapOptions);
   }
 
   /**
@@ -109,7 +159,7 @@ class DataStore extends Emitter {
    * @returns {String}
    */
   getStorageKey (key = '') {
-    if (keys.length(key) > this._storage.maxKeyLength) key = keys.slice(key, 0, this._storage.maxKeyLength);
+    if (keys.length(key) > this._storage.keyLength) key = keys.slice(key, 0, this._storage.keyLength);
     return key;
   }
 
@@ -135,7 +185,7 @@ class DataStore extends Emitter {
       const publicMethod = method.slice(1);
 
       // Route to handler if it exists
-      if (handler && this._handlers && handler in this._handlers[publicMethod]) {
+      if (handler && this._handlers && this._handlers[publicMethod] && handler in this._handlers[publicMethod]) {
         return this._handlers[publicMethod][handler](this, this[method], key, ...rest);
       }
       return this[method](key, ...rest);
@@ -176,6 +226,17 @@ class DataStore extends Emitter {
     }
 
     return value;
+  }
+
+  /**
+   * Check if 'value' is expired
+   * @param {Object} value
+   */
+  _checkExpiry (value) {
+    if (value && value.expires && time.now() > value.expires) {
+      value.expired = true;
+      value.expires = 0;
+    }
   }
 
   /**
@@ -221,8 +282,8 @@ class DataStore extends Emitter {
       // Handle persistence
       // Allow options to override global config
       if ('persistent' in options && options.persistent
-        || ~this._storage.persistentKeys.indexOf(key)
-        || ~this._storage.persistentKeys.indexOf(keys.first(key))) {
+        || ~this._storage.namespaces.indexOf(key)
+        || ~this._storage.namespaces.indexOf(keys.first(key))) {
           this._persist(key);
       }
     }
@@ -254,8 +315,8 @@ class DataStore extends Emitter {
       }
 
       // Prune from storage
-      if (~this._storage.persistentKeys.indexOf(key)
-        || ~this._storage.persistentKeys.indexOf(keys.first(key))) {
+      if (~this._storage.namespaces.indexOf(key)
+        || ~this._storage.namespaces.indexOf(keys.first(key))) {
           this._unpersist(key);
       }
 
@@ -380,8 +441,8 @@ class DataStore extends Emitter {
 
           // Allow options to override global config
           if ('reload' in options && options.reload
-            || ~this._loading.reloadKeys.indexOf(key)
-            || ~this._loading.reloadKeys.indexOf(keys.first(key))) {
+            || ~this._loading.namespaces.indexOf(key)
+            || ~this._loading.namespaces.indexOf(keys.first(key))) {
               this._reload(key, url, options);
           }
         });
@@ -448,6 +509,17 @@ class DataStore extends Emitter {
     if (this._storage.store) {
       this._storage.store.remove(this.getStorageKey(key));
     }
+  }
+
+  /**
+   * Update storage when versions don't match
+   * @param {String} key
+   * @param {Object} value
+   * @returns {Object}
+   */
+  _upgradeStorageData (key, value) {
+    // Delete as default
+    return null;
   }
 
   /**
@@ -574,61 +646,6 @@ class DataStore extends Emitter {
       ? data
       : null;
   }
-
-  /**
-   * Check if 'value' is expired
-   * @param {Object} value
-   */
-  _checkExpiry (value) {
-    if (value && value.expires && time.now() > value.expires) {
-      value.expired = true;
-      value.expires = 0;
-    }
-  }
-
-
-
-  /**
-   * Bootstrap from storage
-   */
-  bootstrap () {
-    // if (this._storage.store) {
-    //   const storageId = this.getStorageKey();
-    //   let data = this._storage.get(storageId);
-    //   let options = {
-    //     immutable: false,
-    //     persistent: false
-    //   };
-
-    //   // Invalidate on version mismatch
-    //   if (this._storage.shouldUpgrade(storageId)) {
-    //     data = this._upgradeStorage(data);
-    //     options.persistent = true;
-    //   }
-
-    //   for (const key in data) {
-    //     // Remove prefix
-    //     const k = keys.slice(key, 1);
-
-    //     // Treat as batch if no key
-    //     this.set(!k ? null : k, data[key], options);
-    //   }
-    // }
-  }
-
-  /**
-   * Update storage when versions don't match
-   * @param {Object} data
-   * @param {Object} options
-   * @returns {Object}
-   */
-  _upgradeStorage (data, options) {
-    for (const key in data) {
-      this._storage.remove(key);
-    }
-    return data;
-  }
-
 }
 
 /**
@@ -647,16 +664,3 @@ function getExpiry (timestamp, minimum) {
     // Local clock is set incorrectly
     : now + minimum;
 }
-
-module.exports = DataStore;
-
-/**
- * Instance factory
- * @param {String} [id]
- * @param {Object} [data]
- * @param {Object} [options]
- * @returns {DataStore}
- */
-module.exports.create = function create (id, data, options) {
-  return new DataStore(id, data, options);
-};

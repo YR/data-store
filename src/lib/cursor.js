@@ -29,10 +29,11 @@ class DataStoreCursor {
    * @returns {Object}
    */
   get (key) {
-    const fixKey = (k) => {
-      return (!this.dataStore.isRootKey(k))
-        ? keys.join(this.key, k)
-        : k;
+    const fixKey = (key) => {
+      // Prefix with cursor key if not root
+      return (!this.dataStore.isRootKey(key))
+        ? keys.join(this.key, key)
+        : key;
     };
 
     // Handle empty key (set value at cursor root)
@@ -56,13 +57,9 @@ class DataStoreCursor {
     if (!key) key = this.key;
 
     // Convert to batch
-    if ('string' == typeof key) {
-      key = {
-        [key]: value
-      };
-    }
+    if ('string' == typeof key) key = { [key]: value };
 
-    // Fix keys
+    // Fix keys (prefix with cursor key if not root)
     for (const k in key) {
       if (!this.dataStore.isRootKey(k)) {
         key[keys.join(this.key, k)] = key[k];
