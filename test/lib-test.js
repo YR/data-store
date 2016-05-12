@@ -142,7 +142,7 @@ describe('dataStore', function () {
           }
         }
       };
-      expect(store.get('foo/bar')).to.equal('bat');
+      expect(store.get('foo/bar')).to.equal('boo');
     });
   });
 
@@ -209,8 +209,8 @@ describe('dataStore', function () {
       expect(store.get()).to.not.have.property('a');
     });
     it('should persist data to storage with "options.persistent"', function () {
-      store.set('bar', 'foo', { persistent: true });
-      expect(storage.get('bar')).to.eql({ bar: 'foo' });
+      store.set('bar', { boo: 'foo' }, { persistent: true });
+      expect(storage.get('bar')).to.eql({ 'bar/boo': 'foo' });
     });
     it('should persist data to storage with config "persistentKeys"', function () {
       store._storage.namespaces = ['foo'];

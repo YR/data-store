@@ -33,7 +33,7 @@ const DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
-const DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'upgradeStorageData'];
+const DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'persist', 'unpersist', 'upgradeStorageData'];
 let uid = 0;
 
 /**
@@ -66,7 +66,7 @@ class DataStore extends Emitter {
    *    - store {Object}
    *  - writable {Boolean}
    */
-  constructor (id, data = {}, options = {}) {
+  constructor (id, data, options = {}) {
     super();
 
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
@@ -95,7 +95,7 @@ class DataStore extends Emitter {
       this[privateMethod] = this[privateMethod].bind(this);
     }
 
-    this.bootstrap(this._storage, data);
+    this.bootstrap(this._storage, data || {});
   }
 
   /**
@@ -124,12 +124,10 @@ class DataStore extends Emitter {
         return assign(accumulatedStorageData, storageData);
       }, {});
 
-      this.set(storageData, null, bootstrapOptions);
-      // Flatten data to force key length
-      data = property.flatten(data, this._storage.keyLength);
+      this.set(storageData, bootstrapOptions);
     }
 
-    this.set(data, null, bootstrapOptions);
+    this.set(data, bootstrapOptions);
   }
 
   /**
@@ -159,14 +157,17 @@ class DataStore extends Emitter {
    * @returns {String}
    */
   getStorageKey (key = '') {
-    if (keys.length(key) > this._storage.keyLength) key = keys.slice(key, 0, this._storage.keyLength);
-    return key;
+    const length = keys.length(key);
+
+    if (length < this._storage.keyLength) return '';
+    return keys.slice(key, 0, this._storage.keyLength);
   }
 
   /**
    * Route 'method' to appropriate handler
    * depending on passed 'key' (args[0])
    * @param {String} method
+   * @param {*} args
    * @returns {Object|null}
    */
   _route (method, ...args) {
@@ -180,13 +181,15 @@ class DataStore extends Emitter {
       // Handle links
       if (key in this._links) key = this._links[key];
 
-      const handler = keys.first(key);
+      const namespace = keys.first(key);
       // Remove leading '_'
       const publicMethod = method.slice(1);
 
       // Route to handler if it exists
-      if (handler && this._handlers && this._handlers[publicMethod] && handler in this._handlers[publicMethod]) {
-        return this._handlers[publicMethod][handler](this, this[method], key, ...rest);
+      if (namespace && this._handlers && this._handlers[publicMethod] && namespace in this._handlers[publicMethod]) {
+        const scopedMethod = this._getScopedMethod(method, namespace);
+
+        return this._handlers[publicMethod][namespace](this, scopedMethod, keys.slice(key, 1), ...rest);
       }
       return this[method](key, ...rest);
     }
@@ -205,6 +208,16 @@ class DataStore extends Emitter {
         return this._route(method, k, ...rest);
       });
     }
+  }
+
+  /**
+   * Retrieve a scoped method for namespaced handlers to call
+   * @param {String} method
+   * @param {String} namespace
+   * @returns {Function}
+   */
+  _getScopedMethod (method, namespace) {
+    return (key, ...args) => this[method](keys.join(namespace, key), ...args);
   }
 
   /**
@@ -233,6 +246,7 @@ class DataStore extends Emitter {
    * @param {Object} value
    */
   _checkExpiry (value) {
+    // TODO: load if expired?
     if (value && value.expires && time.now() > value.expires) {
       value.expired = true;
       value.expires = 0;
@@ -496,8 +510,26 @@ class DataStore extends Emitter {
    */
   _persist (key) {
     if (this._storage.store) {
-      key = this.getStorageKey(key);
-      this._storage.store.set(key, this.toJSON(key));
+      const storageKey = this.getStorageKey(key);
+
+      // Key length too short
+      if (!storageKey) {
+        const { keyLength } = this._storage;
+        const parentData = this._get(keys.slice(key, 0, -1));
+        let data = {};
+
+        for (const k in parentData) {
+          if (key.indexOf(k) == 0) data[k] = parentData[k];
+        }
+        data = property.flatten(data, keyLength - 1);
+
+        for (const k in data) {
+          // Ignore short keys (prevent recursive trap)
+          if (keys.length(k) >= keyLength) this._persist(k);
+        }
+        return;
+      }
+      this._storage.store.set(storageKey, this._get(storageKey));
     }
   }
 
@@ -607,7 +639,7 @@ class DataStore extends Emitter {
    * @returns {Object}
    */
   toJSON (key) {
-    if (key) return this._serialise(key, this.get(key));
+    if (key) return this._serialise(key, this._get(key));
     return this._serialise(null, this._data);
   }
 
