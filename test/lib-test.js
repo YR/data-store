@@ -155,6 +155,17 @@ describe('dataStore', function () {
     });
   });
 
+  describe.only('getStorageKeys()', function () {
+    it('should return all keys if passed an empty key', function () {
+      store._storage.namespaces = ['foo'];
+      expect(store.getStorageKeys('')).to.eql(['foo/bar', 'foo/boo']);
+    });
+    it('should return keys of a fixed length', function () {
+      store._storage.namespaces = ['foo'];
+      expect(store.getStorageKeys('foo/boo/bar')).to.eql(['foo/boo']);
+    });
+  });
+
   describe('set()', function () {
     it('should modify a property\'s value when called with simple key', function () {
       store.set('foo', 'bar');

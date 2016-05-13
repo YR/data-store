@@ -151,16 +151,24 @@ class DataStore extends Emitter {
   }
 
   /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
+   * Retrieve storage keys for 'key'
+   * based on storage.keyLength.
    * @param {String} key
-   * @returns {String}
+   * @returns {Array}
    */
-  getStorageKey (key = '') {
+  getStorageKeys (key = '') {
+    const { keyLength } = this._storage;
     const length = keys.length(key);
 
-    if (length < this._storage.keyLength) return '';
-    return keys.slice(key, 0, this._storage.keyLength);
+    if (length < keyLength) {
+      const parentData = property.flatten(this._get(keys.slice(key, 0, -1)), keyLength - 1);
+
+      return Object.keys(parentData).filter((k) => {
+        return k.indexOf(key) == 0;
+      });
+    }
+
+    return [keys.slice(key, 0, this._storage.keyLength)];
   }
 
   /**
@@ -510,26 +518,9 @@ class DataStore extends Emitter {
    */
   _persist (key) {
     if (this._storage.store) {
-      const storageKey = this.getStorageKey(key);
-
-      // Key length too short
-      if (!storageKey) {
-        const { keyLength } = this._storage;
-        const parentData = this._get(keys.slice(key, 0, -1));
-        let data = {};
-
-        for (const k in parentData) {
-          if (key.indexOf(k) == 0) data[k] = parentData[k];
-        }
-        data = property.flatten(data, keyLength - 1);
-
-        for (const k in data) {
-          // Ignore short keys (prevent recursive trap)
-          if (keys.length(k) >= keyLength) this._persist(k);
-        }
-        return;
-      }
-      this._storage.store.set(storageKey, this._get(storageKey));
+      this.getStorageKeys(key).forEach((storageKey) => {
+        this._storage.store.set(storageKey, this._get(storageKey));
+      });
     }
   }
 
@@ -539,7 +530,9 @@ class DataStore extends Emitter {
    */
   _unpersist (key) {
     if (this._storage.store) {
-      this._storage.store.remove(this.getStorageKey(key));
+      this.getStorageKeys(key).forEach((storageKey) => {
+        this._storage.store.remove(storageKey);
+      });
     }
   }
 
