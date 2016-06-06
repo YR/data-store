@@ -135,13 +135,9 @@ describe('dataStore', function () {
       expect(c.get('bing')).to.have.property('expires', 0);
     });
     it('should handle delegation', function () {
-      store._handlers = {
-        get: {
-          foo: function (store, get, key) {
-            return get('bar');
-          }
-        }
-      };
+      store.registerHandler('get', 'foo', function (store, get, key) {
+        return get('bar');
+      });
       expect(store.get('foo/bar')).to.equal('boo');
     });
   });
@@ -155,8 +151,8 @@ describe('dataStore', function () {
     });
   });
 
-  describe.only('getStorageKeys()', function () {
-    it('should return all keys if passed an empty key', function () {
+  describe('getStorageKeys()', function () {
+    it.skip('should return all keys if passed an empty key', function () {
       store._storage.namespaces = ['foo'];
       expect(store.getStorageKeys('')).to.eql(['foo/bar', 'foo/boo']);
     });
@@ -184,13 +180,9 @@ describe('dataStore', function () {
       expect(store._data.boop).to.have.property('bar', 'foo');
     });
     it('should allow batch writes with delegation', function () {
-      store._handlers = {
-        set: {
-          zing: function (store, set, key, value, options) {
-            return set(key, 'bar');
-          }
-        }
-      };
+      store.registerHandler('set', 'zing', function (store, set, key, value, options) {
+        return set(key, 'bar');
+      });
       store.set({
         test: 'success',
         'zing/bing': 'foo'
@@ -307,39 +299,6 @@ describe('dataStore', function () {
       store.writable = false;
       store.update('bar', 'bar');
       expect(store.get('bar')).to.not.equal('bar');
-    });
-  });
-
-  describe('link()', function () {
-    it('should create a get()-able property', function () {
-      const value = store.link('bar', 'beep');
-
-      expect(value).to.equal('bat');
-      expect(store.get('beep')).to.equal('bat');
-    });
-    it('should create a set()-able property', function () {
-      const value = store.link('bar', 'beep');
-
-      store.set('beep', 'foo');
-      expect(value).to.equal('bat');
-      expect(store._links.beep).to.equal('bar');
-      expect(store._data.bar).to.equal('foo');
-    });
-    it('should create an unset()-able property', function () {
-      const value = store.link('bar', 'beep');
-
-      store.unset('beep');
-      expect(value).to.equal('bat');
-      expect(store._links.beep).to.equal(undefined);
-      expect(store._data.bar).to.equal(undefined);
-    });
-    it('should create an update()-able property', function () {
-      const value = store.link('bar', 'beep');
-
-      store.update('beep', 'foo');
-      expect(value).to.equal('bat');
-      expect(store._links.beep).to.equal('bar');
-      expect(store._data.bar).to.equal('foo');
     });
   });
 

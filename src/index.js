@@ -33,7 +33,7 @@ const DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
-const DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'persist', 'unpersist', 'upgradeStorageData'];
+const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'persist', 'unpersist', 'upgradeStorageData'];
 let uid = 0;
 
 /**
@@ -76,8 +76,7 @@ class DataStore extends Emitter {
 
     this._cursors = {};
     this._data = {};
-    this._handlers = options.handlers;
-    this._links = {};
+    this._handlers = {};
     this._loading = assign({
       active: {},
       namespaces: []
@@ -88,11 +87,19 @@ class DataStore extends Emitter {
       namespaces: []
     }, options.storage);
 
+    // Generate delegated methods
     for (const method of DELEGATED_METHODS) {
       const privateMethod = `_${method}`;
 
       this[method] = this._route.bind(this, privateMethod);
       this[privateMethod] = this[privateMethod].bind(this);
+      // Setup handlers
+      this._handlers[privateMethod] = {};
+      if (options.handlers && method in options.handlers) {
+        for (const namespace in options.handlers[method]) {
+          this.registerHandler(method, namespace, options.handlers[method][namespace]);
+        }
+      }
     }
 
     this.bootstrap(this._storage, data || {});
@@ -172,6 +179,23 @@ class DataStore extends Emitter {
   }
 
   /**
+   * Register 'handler' for 'method' and 'namespace'
+   * @param {String} method
+   * @param {String} namespace
+   * @param {Function} handler
+   */
+  registerHandler (method, namespace, handler) {
+    const privateMethod = `_${method}`;
+
+    // Prevent overwriting
+    if (!this._handlers[privateMethod][namespace]) {
+      const scopedMethod = (key, ...args) => this[privateMethod](keys.join(namespace, key), ...args);
+
+      this._handlers[privateMethod][namespace] = { handler, scopedMethod };
+    }
+  }
+
+  /**
    * Route 'method' to appropriate handler
    * depending on passed 'key' (args[0])
    * @param {String} method
@@ -186,18 +210,15 @@ class DataStore extends Emitter {
     if ('string' == typeof key) {
       if (key.charAt(0) == '/') key = key.slice(1);
 
-      // Handle links
-      if (key in this._links) key = this._links[key];
-
       const namespace = keys.first(key);
       // Remove leading '_'
       const publicMethod = method.slice(1);
 
       // Route to handler if it exists
-      if (namespace && this._handlers && this._handlers[publicMethod] && namespace in this._handlers[publicMethod]) {
-        const scopedMethod = this._getScopedMethod(method, namespace);
+      if (namespace && namespace in this._handlers[method]) {
+        const { handler, scopedMethod } = this._handlers[method][namespace];
 
-        return this._handlers[publicMethod][namespace](this, scopedMethod, keys.slice(key, 1), ...rest);
+        return handler(this, scopedMethod, keys.slice(key, 1), ...rest);
       }
       return this[method](key, ...rest);
     }
@@ -216,16 +237,6 @@ class DataStore extends Emitter {
         return this._route(method, k, ...rest);
       });
     }
-  }
-
-  /**
-   * Retrieve a scoped method for namespaced handlers to call
-   * @param {String} method
-   * @param {String} namespace
-   * @returns {Function}
-   */
-  _getScopedMethod (method, namespace) {
-    return (key, ...args) => this[method](keys.join(namespace, key), ...args);
   }
 
   /**
@@ -329,12 +340,6 @@ class DataStore extends Emitter {
 
       this.debug('unset "%s"', key);
       delete data[k];
-      // Prune dead links
-      for (const toKey in this._links) {
-        if (this._links[toKey] == key) {
-          delete this._links[toKey];
-        }
-      }
 
       // Prune from storage
       if (~this._storage.namespaces.indexOf(key)
@@ -376,17 +381,6 @@ class DataStore extends Emitter {
         this.emit('update', key, value, oldValue, options, ...args);
       });
     }
-  }
-
-  /**
-   * Create link between 'fromKey' and 'toKey' keys
-   * @param {String} fromKey
-   * @param {String} toKey
-   * @returns {Object}
-   */
-  _link (fromKey, toKey) {
-    this._links[toKey] = fromKey;
-    return this.get(fromKey);
   }
 
   /**
@@ -594,7 +588,6 @@ class DataStore extends Emitter {
     this._cursors = {};
     this._data = {};
     this._handlers = {};
-    this._links = {};
     this._loading = {};
     this._serialisable = {};
     this._storage = {};
