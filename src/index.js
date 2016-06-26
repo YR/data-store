@@ -18,14 +18,14 @@ const keys = require('@yr/keys');
 const property = require('@yr/property');
 const runtime = require('@yr/runtime');
 const time = require('@yr/time');
+const uuid = require('uuid');
 
 const DEFAULT_LATENCY = 10000;
 const DEFAULT_LOAD_OPTIONS = {
-  defaultExpiry: 600000,
-  retry: 3,
+  expiry: 60000,
+  retry: 2,
   timeout: 5000
 };
-const DEFAULT_STORAGE_KEY_LENGTH = 2;
 const DEFAULT_SET_OPTIONS = {
   // Browser immutable by default
   immutable: runtime.isBrowser,
@@ -33,8 +33,10 @@ const DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
-const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'persist', 'unpersist', 'upgradeStorageData'];
-let uid = 0;
+const DEFAULT_STORAGE_OPTIONS = {
+  keyLength: 2
+};
+const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'fetc', 'load', 'reload', 'persist', 'unpersist', 'upgradeStorageData'];
 
 /**
  * Instance factory
@@ -53,39 +55,33 @@ class DataStore extends Emitter {
    * @param {String} [id]
    * @param {Object} [data]
    * @param {Object} [options]
-   *  - handlers {Object} method:key
-   *  - loading {Object}
-   *    - defaultExpiry {Number}
-   *    - namespaces {Array}
-   *    - retry {Number}
-   *    - timeout {Number}
-   *  - serialisable {Object} key:Boolean
-   *  - storage {Object}
-   *    - keyLength {Number}
-   *    - namespaces {Array}
-   *    - store {Object}
-   *  - writable {Boolean}
+   *  - {Object} handlers method:key
+   *  - {Object} loading
+   *    - {Number} expiry
+   *    - {Number} retry
+   *    - {Number} timeout
+   *  - {Object} serialisable key:Boolean
+   *  - {Object} storage
+   *    - {Number} keyLength
+   *    - {Object} store
+   *  - {Boolean} writable
    */
   constructor (id, data, options = {}) {
     super();
 
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
+    this.uid = uuid.v4();
     this.id = id || `store${--uid}`;
     this.writable = 'writable' in options ? options.writable : true;
 
     this._cursors = {};
     this._data = {};
     this._handlers = {};
-    this._loading = assign({
-      active: {},
-      namespaces: []
-    }, DEFAULT_LOAD_OPTIONS, options.loading);
+    this._loadTimeout =
+    this._loading = assign({}, DEFAULT_LOAD_OPTIONS, options.loading);
     this._serialisable = options.serialisable || {};
-    this._storage = assign({
-      keyLength: DEFAULT_STORAGE_KEY_LENGTH,
-      namespaces: []
-    }, options.storage);
+    this._storage = assign({}, DEFAULT_STORAGE_OPTIONS, options.storage);
 
     // Generate delegated methods
     for (const method of DELEGATED_METHODS) {
@@ -265,7 +261,6 @@ class DataStore extends Emitter {
    * @param {Object} value
    */
   _checkExpiry (value) {
-    // TODO: load if expired?
     if (value && value.expires && time.now() > value.expires) {
       value.expired = true;
       value.expires = 0;
@@ -277,10 +272,9 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {Object} value
    * @param {Object} [options]
-   *  - immutable {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
+   *  - {Boolean} immutable
+   *  - {Boolean} reference
+   *  - {Boolean} merge
    * @returns {Object}
    */
   _set (key, value, options) {
@@ -296,8 +290,8 @@ class DataStore extends Emitter {
       // Handle removal of key
       if ('string' == typeof key && value == null) return this._unset(key);
 
-      // Store serialisability
-      if ('serialisable' in options) this.setSerialisable(key, options.serialisable);
+      // Write reference key
+      if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
 
       if (options.immutable) {
         // Returns null if no change
@@ -313,12 +307,7 @@ class DataStore extends Emitter {
       }
 
       // Handle persistence
-      // Allow options to override global config
-      if ('persistent' in options && options.persistent
-        || ~this._storage.namespaces.indexOf(key)
-        || ~this._storage.namespaces.indexOf(keys.first(key))) {
-          this._persist(key);
-      }
+      if ('persistent' in options && options.persistent) this._persist(key);
     }
 
     return value;
@@ -342,12 +331,9 @@ class DataStore extends Emitter {
       delete data[k];
 
       // Prune from storage
-      if (~this._storage.namespaces.indexOf(key)
-        || ~this._storage.namespaces.indexOf(keys.first(key))) {
-          this._unpersist(key);
-      }
+      this._unpersist(key);
 
-      // Delay to prevent race condition (view render)
+      // Delay to prevent race condition
       clock.immediate(() => {
         this.emit('unset:' + key, null, oldValue);
         this.emit('unset', key, null, oldValue);
@@ -361,16 +347,21 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {Object} value
    * @param {Object} options
-   *  - immutable {Boolean}
-   *  - reference {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
+   *  - {Boolean} reference
+   *  - {Boolean} merge
    */
-  _update (key, value, options = {}, ...args) {
+  _update (key, value, options, ...args) {
+    options = options || {};
+
     if (this.writable) {
+      // Resolve reference keys (use reference key to write to original object)
+      const parent = this.get(keys.slice(key, 0, -1));
+
+      if (parent && parent.__ref) key = keys.join(parent.__ref, keys.last(key));
+
       this.debug('update %s', key);
       const oldValue = this.get(key);
+      // TODO: bail if no oldValue?
 
       options.immutable = true;
       this.set(key, value, options);
@@ -388,83 +379,78 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {String} url
    * @param {Object} [options]
-   *  - abort {Boolean}
-   *  - ignoreQuery {Boolean}
-   *  - immutable {Boolean}
-   *  - isReload {Boolean}
-   *  - reference {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
    * @returns {Response}
    */
-  _load (key, url, options = {}) {
-    const req = agent.get(url, options);
+  _load (key, url, options) {
+    options = options || {};
+    options.id = this.uid;
 
-    if (!this._loading.active[key]) {
-      this.debug('load %s from %s', key, url);
+    this.debug('load %s from %s', key, url);
 
-      this._loading.active[key] = true;
+    return agent
+      .get(url, options)
+      .timeout(this._loading.timeout)
+      .retry(this._loading.retry)
+      .then((res) => {
+        this.debug('loaded "%s" in %dms', key, res.duration);
 
-      req.timeout(this._loading.timeout)
-        .retry(this._loading.retry)
-        .end((err, res) => {
-          delete this._loading.active[key];
+        let value;
 
-          if (err) {
-            this.debug('remote resource "%s" not found at %s', key, url);
-            // Remove if no longer found
-            if (err.status < 500) this.unset(key);
-          } else {
-            this.debug('loaded "%s" in %dms', key, res.duration);
+        // Guard against empty data
+        if (res.body) {
+          // TODO: make more generic with bodyParser option/handler
+          // Handle locations results separately
+          let data = ('totalResults' in res.body)
+            ? (res.body._embedded && res.body._embedded.location) || []
+            : res.body;
 
-            let expires = 0;
-            let value;
+          // Add expires header
+          if (res.headers && 'expires' in res.headers) {
+            const expires = getExpiry(res.headers.expires, this._loading.expiry);
 
-            // Guard against empty data
-            if (res.body) {
-              // Handle locations results separately
-              let data = ('totalResults' in res.body)
-                ? (res.body._embedded && res.body._embedded.location) || []
-                : res.body;
-
-              // Add expires header
-              if (res.headers && 'expires' in res.headers) {
-                expires = getExpiry(res.headers.expires, this._loading.defaultExpiry);
-
-                if (Array.isArray(data)) {
-                  data.forEach((d) => {
-                    if (isPlainObject(d)) {
-                      d.expires = expires;
-                      d.expired = false;
-                    }
-                  });
-                } else {
-                  data.expires = expires;
-                  data.expired = false;
+            if (Array.isArray(data)) {
+              data.forEach((d) => {
+                if (isPlainObject(d)) {
+                  d.expires = expires;
+                  d.expired = false;
                 }
-              }
-              value = this.set(key, data, options);
-            }
-
-            this.emit('load:' + key, value);
-            this.emit('load', key, value);
-            if (options.isReload) {
-              this.emit('reload:' + key, value);
-              this.emit('reload', key, value);
+              });
+            } else {
+              data.expires = expires;
+              data.expired = false;
             }
           }
 
-          // Allow options to override global config
-          if ('reload' in options && options.reload
-            || ~this._loading.namespaces.indexOf(key)
-            || ~this._loading.namespaces.indexOf(keys.first(key))) {
-              this._reload(key, url, options);
+          // Guard against parse errors during set()
+          try {
+            // Merge with existing
+            options.merge = true;
+            // All remote data stored with reference key
+            options.reference = true;
+            value = this.set(key, data, options);
+          } catch (err) {
+            this.debug('failed to store remote resource "%s" from %s', key, url);
+            // TODO: update error message?
+            err.status = 500;
+            throw err;
           }
-        });
-    }
+        }
 
-    return req;
+        this.emit('load:' + key, value);
+        this.emit('load', key, value);
+
+        return res;
+      })
+      .catch((err) => {
+        this.debug('unable to load "%s" from %s', key, url);
+
+        // Remove if not found or malformed (but not aborted)
+        if (err.status < 499) this.remove(key);
+
+        throw err;
+      });
   }
 
   /**
@@ -472,38 +458,95 @@ class DataStore extends Emitter {
    * @param {String} key
    * @param {String} url
    * @param {Object} [options]
-   *  - abort {Boolean}
-   *  - ignoreQuery {Boolean}
-   *  - immutable {Boolean}
-   *  - isReload {Boolean}
-   *  - reference {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
-   * @returns {null}
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
+   *  - {Boolean} reload
    */
   _reload (key, url, options) {
-    // Already expired
-    if (this.get(`${key}/expired`)) return this.load(key, url, options);
+    options = options || {};
+    if (!options.reload) return;
 
-    let duration = (this.get(`${key}/expires`) || 0) - time.now();
+    const reload = () => {
+      this._load(key, url, options)
+        .then((res) => {
+          const value = this.get(key);
 
-    // Guard against invalid duration (reload on error with old or missing expiry, etc)
-    if (duration <= 0) duration = this._loading.defaultExpiry;
+          this.emit('reload:' + key, value);
+          this.emit('reload', key, value);
+          this._reload(key, url, options);
+        })
+        .catch((err) => {
+          // TODO: error never logged
+          this.debug('unable to reload "%s" from %s', key, url);
+          this._reload(key, url, options);
+        });
+    };
+    const value = this.get(key);
+    // Guard against invalid duration
+    const duration = Math.max((value && value.expires || 0) - time.now(), this._loading.expiry);
 
-    options = assign({}, options, { isReload: true });
     this.debug('reloading "%s" in %dms', key, duration);
-    clock.timeout(duration, () => {
-      this.load(key, url, options);
-    }, key);
+    // Set custom id
+    clock.timeout(duration, reload, url);
   }
 
   /**
-   * Cancel any existing reload timeouts
+   * Fetch data. If expired, load from 'url' and store at 'key'
    * @param {String} key
+   * @param {String} url
+   * @param {Object} [options]
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
+   *  - {Boolean} reload
+   *  - {Boolean} staleWhileRevalidate
+   *  - {Boolean} staleWhileError
+   * @returns {Promise}
    */
-  _cancelReload (key) {
-    clock.cancel(key);
+  _fetch (key, url, options) {
+    options = options || {};
+
+    this.debug('fetch %s from %s', key, url);
+
+    // Set expired state
+    const value = this.get(key);
+
+    // Load if not found or expired
+    if (!value || value.expired) {
+      const load = new Promise((resolve, reject) => {
+        this._load(key, url, options)
+          .then((res) => {
+            // Schedule a reload
+            this._reload(key, url, options);
+            resolve({
+              duration: res.duration,
+              headers: res.headers,
+              data: this.get(key)
+            });
+          })
+          .catch((err) => {
+            // Schedule a reload if error
+            if (err.status >= 500) this._reload(key, url, options);
+            resolve({
+              duration: 0,
+              error: err,
+              headers: { status: err.status },
+              data: options.staleWhileError ? value : null
+            });
+          });
+      });
+
+      // Wait for load unless stale and staleWhileRevalidate
+      if (!(value && options.staleWhileRevalidate)) return load;
+    }
+
+    // Schedule a reload
+    this._reload(key, url, options);
+    // Return data (possibly stale)
+    return Promise.resolve({
+      duration: 0,
+      headers: { status: 200 },
+      data: value
+    });
   }
 
   /**
@@ -568,6 +611,7 @@ class DataStore extends Emitter {
   setSerialisable (key, value) {
     if (this.isRootKey(key)) key = key.slice(1);
 
+    // Handle batch
     if (isPlainObject(key)) {
       for (const k in key) {
         this.setSerialisable(k, value);
@@ -578,9 +622,20 @@ class DataStore extends Emitter {
   }
 
   /**
+   * Abort all outstanding load/reload requests
+   */
+  abort () {
+    // TODO: return aborted urls and use in clock.cancel
+    agent.abortAll(this.uid);
+    clock.cancel(this.id);
+  }
+
+  /**
    * Destroy instance
    */
   destroy () {
+    this.abort();
+
     // Destroy cursors
     for (const key in this._cursors) {
       this._cursors[key].destroy();
@@ -593,7 +648,6 @@ class DataStore extends Emitter {
     this._storage = {};
     this.destroyed = true;
     this.removeAllListeners();
-    clock.cancel(this.id);
   }
 
   /**
@@ -667,14 +721,14 @@ class DataStore extends Emitter {
 }
 
 /**
- * Retrieve expiry from 'timestamp'
- * @param {Number} timestamp
+ * Retrieve expiry from 'dateString'
+ * @param {Number} dateString
  * @param {Number} minimum
  * @returns {Number}
  */
-function getExpiry (timestamp, minimum) {
-  // Add latency overhead to compensate for transmition time
-  const expires = timestamp + DEFAULT_LATENCY;
+function getExpiry (dateString, minimum) {
+  // Add latency overhead to compensate for transmission time
+  const expires = +(new Date(dateString)) + DEFAULT_LATENCY;
   const now = time.now();
 
   return (expires > now)
