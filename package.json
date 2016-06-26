@@ -4,24 +4,25 @@
   "version": "1.0.0",
   "author": "Alexander Pope <alexander.pope@nrk.no>",
   "dependencies": {
-    "@yr/agent": "3.3.2",
+    "@yr/agent": "4.2.0",
     "@yr/clock": "1.1.8",
     "@yr/keys": "1.1.2",
     "@yr/property": "3.1.5",
     "@yr/runtime": "1.2.0",
-    "@yr/time": "3.1.1",
+    "@yr/time": "3.2.0",
     "debug": "2.2.0",
     "eventemitter3": "1.2.0",
     "is-plain-obj": "1.1.0",
-    "object-assign": "4.0.1"
+    "object-assign": "4.1.0",
+    "uuid": "2.0.2"
   },
   "devDependencies": {
-    "buddy": "5.0.x",
-    "buddy-plugin-babel": "6.7.x",
+    "buddy": "5.1.x",
+    "buddy-plugin-babel": "6.10.x",
     "expect.js": "*",
     "mocha": "*",
     "mocha-phantomjs": "*",
-    "nock": "8.0.x"
+    "nock": "*"
   },
   "main": "src/index.js",
   "repository": "https://github.com/YR/data-store.git",
