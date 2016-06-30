@@ -89,7 +89,6 @@ class DataStore extends Emitter {
     this._cursors = {};
     this._data = {};
     this._handlers = {};
-    this._loadTimeout =
     this._loading = assign({}, DEFAULT_LOAD_OPTIONS, options.loading);
     this._serialisable = options.serialisable || {};
     this._storage = assign({}, DEFAULT_STORAGE_OPTIONS, options.storage);
@@ -121,25 +120,25 @@ class DataStore extends Emitter {
     // Bootstrap data
     const bootstrapOptions = { immutable: false };
 
-    if (storage.store) {
-      const { namespaces, store } = storage;
-      const storageData = namespaces.reduce((accumulatedStorageData, namespace) => {
-        let storageData = store.get(namespace);
+    // if (storage.store) {
+    //   const { namespaces, store } = storage;
+    //   const storageData = namespaces.reduce((accumulatedStorageData, namespace) => {
+    //     let storageData = store.get(namespace);
 
-        // Handle version mismatch
-        if (store.shouldUpgrade(namespace)) {
-          for (const key in storageData) {
-            store.remove(key);
-            // Allow handlers to override
-            storageData[key] = this.upgradeStorageData(key, storageData[key]);
-          }
-        }
+    //     // Handle version mismatch
+    //     if (store.shouldUpgrade(namespace)) {
+    //       for (const key in storageData) {
+    //         store.remove(key);
+    //         // Allow handlers to override
+    //         storageData[key] = this.upgradeStorageData(key, storageData[key]);
+    //       }
+    //     }
 
-        return assign(accumulatedStorageData, storageData);
-      }, {});
+    //     return assign(accumulatedStorageData, storageData);
+    //   }, {});
 
-      this.set(storageData, bootstrapOptions);
-    }
+    //   this.set(storageData, bootstrapOptions);
+    // }
 
     this.set(data, bootstrapOptions);
   }
