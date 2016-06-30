@@ -36,7 +36,18 @@ const DEFAULT_SET_OPTIONS = {
 const DEFAULT_STORAGE_OPTIONS = {
   keyLength: 2
 };
-const DELEGATED_METHODS = ['get', 'set', 'unset', 'update', 'fetc', 'load', 'reload', 'persist', 'unpersist', 'upgradeStorageData'];
+const DELEGATED_METHODS = [
+  'fetch',
+  'get',
+  'load',
+  'persist',
+  'reload',
+  'set',
+  'unpersist',
+  'unset',
+  'update',
+  'upgradeStorageData'
+];
 
 /**
  * Instance factory
@@ -227,7 +238,7 @@ class DataStore extends Emitter {
       return;
     }
 
-    // Array of keys (get, load)
+    // Array of keys (get)
     if (Array.isArray(key)) {
       return key.map((k) => {
         return this._route(method, k, ...rest);
@@ -248,23 +259,12 @@ class DataStore extends Emitter {
 
     // Check expiry
     if (Array.isArray(value)) {
-      value.forEach(this._checkExpiry, this);
+      value.forEach(checkExpiry);
     } else {
-      this._checkExpiry(value);
+      checkExpiry(value);
     }
 
     return value;
-  }
-
-  /**
-   * Check if 'value' is expired
-   * @param {Object} value
-   */
-  _checkExpiry (value) {
-    if (value && value.expires && time.now() > value.expires) {
-      value.expired = true;
-      value.expires = 0;
-    }
   }
 
   /**
@@ -627,7 +627,7 @@ class DataStore extends Emitter {
   abort () {
     // TODO: return aborted urls and use in clock.cancel
     agent.abortAll(this.uid);
-    clock.cancel(this.id);
+    // clock.cancelAll(this.id);
   }
 
   /**
@@ -735,4 +735,15 @@ function getExpiry (dateString, minimum) {
     ? expires
     // Local clock is set incorrectly
     : now + minimum;
+}
+
+/**
+ * Check if 'value' is expired
+ * @param {Object} value
+ */
+function checkExpiry (value) {
+  if (value && isPlainObject(value) && value.expires && time.now() > value.expires) {
+    value.expired = true;
+    value.expires = 0;
+  }
 }
