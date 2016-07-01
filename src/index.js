@@ -117,30 +117,30 @@ class DataStore extends Emitter {
    * @param {Object} data
    */
   bootstrap (storage, data) {
-    // Bootstrap data
-    const bootstrapOptions = { immutable: false };
+    const { keyLength, store } = storage;
+    const options = { immutable: false };
 
-    // if (storage.store) {
-    //   const { namespaces, store } = storage;
-    //   const storageData = namespaces.reduce((accumulatedStorageData, namespace) => {
-    //     let storageData = store.get(namespace);
+    if (store) {
+      const storageData = Object.keys(property.reshape(store.get('/'), 1))
+        .map((namespace) => {
+          const value = storageData[namespace];
 
-    //     // Handle version mismatch
-    //     if (store.shouldUpgrade(namespace)) {
-    //       for (const key in storageData) {
-    //         store.remove(key);
-    //         // Allow handlers to override
-    //         storageData[key] = this.upgradeStorageData(key, storageData[key]);
-    //       }
-    //     }
+          // Handle version mismatch
+          if (store.shouldUpgrade(namespace)) {
+            // Clear all storage data for namespace
+            for (const key in property.reshape(value, keyLength - 1)) {
+              store.remove(keys.join(namespace, key));
+            }
+            // Allow handlers to override
+            return this.upgradeStorageData(namespace, value);
+          }
+          return value;
+        });
 
-    //     return assign(accumulatedStorageData, storageData);
-    //   }, {});
+      this.set(storageData, options);
+    }
 
-    //   this.set(storageData, bootstrapOptions);
-    // }
-
-    this.set(data, bootstrapOptions);
+    this.set(data, options);
   }
 
   /**
@@ -153,8 +153,7 @@ class DataStore extends Emitter {
   }
 
   /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
+   * Retrieve global version of 'key'
    * @param {String} key
    * @returns {String}
    */
@@ -165,7 +164,7 @@ class DataStore extends Emitter {
 
   /**
    * Retrieve storage keys for 'key'
-   * based on storage.keyLength.
+   * based on storage.keyLength
    * @param {String} key
    * @returns {Array}
    */
@@ -174,14 +173,14 @@ class DataStore extends Emitter {
     const length = keys.length(key);
 
     if (length < keyLength) {
-      const parentData = property.flatten(this._get(keys.slice(key, 0, -1)), keyLength - 1);
+      const parentData = property.reshape(this._get(keys.slice(key, 0, -1)), keyLength);
 
-      return Object.keys(parentData).filter((k) => {
-        return k.indexOf(key) == 0;
-      });
+      return Object.keys(parentData)
+        .filter((k) => k.indexOf(key) == 0)
+        .map((k) => `/${k}`);
     }
 
-    return [keys.slice(key, 0, this._storage.keyLength)];
+    return [`/${keys.slice(key, 0, this._storage.keyLength)}`];
   }
 
   /**
@@ -254,7 +253,7 @@ class DataStore extends Emitter {
     // Return all if no key specified
     if (!key) return this._data;
 
-    const value = property.get(key, this._data);
+    const value = property.get(this._data, key);
 
     // Check expiry
     if (Array.isArray(value)) {
@@ -293,16 +292,16 @@ class DataStore extends Emitter {
       if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
 
       if (options.immutable) {
-        // Returns null if no change
-        const newData = property.set(key, value, this._data, options);
+        // Returns same if no change
+        const newData = property.set(this._data, key, value, options);
 
-        if (newData !== null) {
+        if (newData !== this._data) {
           this._data = newData;
         } else {
           this.debug('WARNING no change after set "%s', key);
         }
       } else {
-        property.set(key, value, this._data, options);
+        property.set(this._data, key, value, options);
       }
 
       // Handle persistence

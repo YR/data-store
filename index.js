@@ -18,14 +18,14 @@ var keys = require('@yr/keys');
 var property = require('@yr/property');
 var runtime = require('@yr/runtime');
 var time = require('@yr/time');
+var uuid = require('uuid');
 
 var DEFAULT_LATENCY = 10000;
 var DEFAULT_LOAD_OPTIONS = {
-  defaultExpiry: 600000,
-  retry: 3,
+  expiry: 60000,
+  retry: 2,
   timeout: 5000
 };
-var DEFAULT_STORAGE_KEY_LENGTH = 2;
 var DEFAULT_SET_OPTIONS = {
   // Browser immutable by default
   immutable: runtime.isBrowser,
@@ -33,8 +33,10 @@ var DEFAULT_SET_OPTIONS = {
   serialisable: true,
   merge: true
 };
-var DELEGATED_METHODS = ['get', 'link', 'set', 'unset', 'update', 'load', 'reload', 'cancelReload', 'upgradeStorageData'];
-var uid = 0;
+var DEFAULT_STORAGE_OPTIONS = {
+  keyLength: 2
+};
+var DELEGATED_METHODS = ['fetch', 'get', 'load', 'persist', 'reload', 'set', 'unpersist', 'unset', 'update', 'upgradeStorageData'];
 
 /**
  * Instance factory
@@ -55,22 +57,19 @@ var DataStore = function (_Emitter) {
    * @param {String} [id]
    * @param {Object} [data]
    * @param {Object} [options]
-   *  - handlers {Object} method:key
-   *  - loading {Object}
-   *    - defaultExpiry {Number}
-   *    - namespaces {Array}
-   *    - retry {Number}
-   *    - timeout {Number}
-   *  - serialisable {Object} key:Boolean
-   *  - storage {Object}
-   *    - keyLength {Number}
-   *    - namespaces {Array}
-   *    - store {Object}
-   *  - writable {Boolean}
+   *  - {Object} handlers method:key
+   *  - {Object} loading
+   *    - {Number} expiry
+   *    - {Number} retry
+   *    - {Number} timeout
+   *  - {Object} serialisable key:Boolean
+   *  - {Object} storage
+   *    - {Number} keyLength
+   *    - {Object} store
+   *  - {Boolean} writable
    */
 
-  function DataStore(id) {
-    var data = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
+  function DataStore(id, data) {
     var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
     babelHelpers.classCallCheck(this, DataStore);
 
@@ -78,23 +77,18 @@ var DataStore = function (_Emitter) {
 
     _this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     _this.destroyed = false;
+    _this.uid = uuid.v4();
     _this.id = id || 'store' + --uid;
     _this.writable = 'writable' in options ? options.writable : true;
 
     _this._cursors = {};
     _this._data = {};
-    _this._handlers = options.handlers;
-    _this._links = {};
-    _this._loading = assign({
-      active: {},
-      namespaces: []
-    }, DEFAULT_LOAD_OPTIONS, options.loading);
+    _this._handlers = {};
+    _this._loading = assign({}, DEFAULT_LOAD_OPTIONS, options.loading);
     _this._serialisable = options.serialisable || {};
-    _this._storage = assign({
-      keyLength: DEFAULT_STORAGE_KEY_LENGTH,
-      namespaces: []
-    }, options.storage);
+    _this._storage = assign({}, DEFAULT_STORAGE_OPTIONS, options.storage);
 
+    // Generate delegated methods
     for (var _iterator = DELEGATED_METHODS, _isArray = Array.isArray(_iterator), _i = 0, _iterator = _isArray ? _iterator : _iterator[Symbol.iterator]();;) {
       var _ref;
 
@@ -113,9 +107,16 @@ var DataStore = function (_Emitter) {
 
       _this[method] = _this._route.bind(_this, privateMethod);
       _this[privateMethod] = _this[privateMethod].bind(_this);
+      // Setup handlers
+      _this._handlers[privateMethod] = {};
+      if (options.handlers && method in options.handlers) {
+        for (var namespace in options.handlers[method]) {
+          _this.registerHandler(method, namespace, options.handlers[method][namespace]);
+        }
+      }
     }
 
-    _this.bootstrap(_this._storage, data);
+    _this.bootstrap(_this._storage, data || {});
     return _this;
   }
 
@@ -127,38 +128,30 @@ var DataStore = function (_Emitter) {
 
 
   DataStore.prototype.bootstrap = function bootstrap(storage, data) {
-    var _this2 = this;
-
     // Bootstrap data
     var bootstrapOptions = { immutable: false };
 
-    if (storage.store) {
-      (function () {
-        var namespaces = storage.namespaces;
-        var store = storage.store;
+    // if (storage.store) {
+    //   const { namespaces, store } = storage;
+    //   const storageData = namespaces.reduce((accumulatedStorageData, namespace) => {
+    //     let storageData = store.get(namespace);
 
-        var storageData = namespaces.reduce(function (accumulatedStorageData, namespace) {
-          var storageData = store.get(namespace);
+    //     // Handle version mismatch
+    //     if (store.shouldUpgrade(namespace)) {
+    //       for (const key in storageData) {
+    //         store.remove(key);
+    //         // Allow handlers to override
+    //         storageData[key] = this.upgradeStorageData(key, storageData[key]);
+    //       }
+    //     }
 
-          // Handle version mismatch
-          if (store.shouldUpgrade(namespace)) {
-            for (var key in storageData) {
-              store.remove(key);
-              // Allow handlers to override
-              storageData[key] = _this2.upgradeStorageData(key, storageData[key]);
-            }
-          }
+    //     return assign(accumulatedStorageData, storageData);
+    //   }, {});
 
-          return assign(accumulatedStorageData, storageData);
-        }, {});
+    //   this.set(storageData, bootstrapOptions);
+    // }
 
-        _this2.set(storageData, null, bootstrapOptions);
-        // Flatten data to force key length
-        data = property.flatten(data, _this2._storage.keyLength);
-      })();
-    }
-
-    this.set(data, null, bootstrapOptions);
+    this.set(data, bootstrapOptions);
   };
 
   /**
@@ -188,24 +181,62 @@ var DataStore = function (_Emitter) {
   };
 
   /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
+   * Retrieve storage keys for 'key'
+   * based on storage.keyLength.
    * @param {String} key
-   * @returns {String}
+   * @returns {Array}
    */
 
 
-  DataStore.prototype.getStorageKey = function getStorageKey() {
+  DataStore.prototype.getStorageKeys = function getStorageKeys() {
     var key = arguments.length <= 0 || arguments[0] === undefined ? '' : arguments[0];
+    var keyLength = this._storage.keyLength;
 
-    if (keys.length(key) > this._storage.keyLength) key = keys.slice(key, 0, this._storage.keyLength);
-    return key;
+    var length = keys.length(key);
+
+    if (length < keyLength) {
+      var parentData = property.flatten(this._get(keys.slice(key, 0, -1)), keyLength - 1);
+
+      return Object.keys(parentData).filter(function (k) {
+        return k.indexOf(key) == 0;
+      });
+    }
+
+    return [keys.slice(key, 0, this._storage.keyLength)];
+  };
+
+  /**
+   * Register 'handler' for 'method' and 'namespace'
+   * @param {String} method
+   * @param {String} namespace
+   * @param {Function} handler
+   */
+
+
+  DataStore.prototype.registerHandler = function registerHandler(method, namespace, handler) {
+    var _this2 = this;
+
+    var privateMethod = '_' + method;
+
+    // Prevent overwriting
+    if (!this._handlers[privateMethod][namespace]) {
+      var scopedMethod = function scopedMethod(key) {
+        for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+          args[_key - 1] = arguments[_key];
+        }
+
+        return _this2[privateMethod].apply(_this2, [keys.join(namespace, key)].concat(args));
+      };
+
+      this._handlers[privateMethod][namespace] = { handler: handler, scopedMethod: scopedMethod };
+    }
   };
 
   /**
    * Route 'method' to appropriate handler
    * depending on passed 'key' (args[0])
    * @param {String} method
+   * @param {*} args
    * @returns {Object|null}
    */
 
@@ -213,8 +244,8 @@ var DataStore = function (_Emitter) {
   DataStore.prototype._route = function _route(method) {
     var _this3 = this;
 
-    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
-      args[_key - 1] = arguments[_key];
+    for (var _len2 = arguments.length, args = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
+      args[_key2 - 1] = arguments[_key2];
     }
 
     var _args$ = args[0];
@@ -227,18 +258,18 @@ var DataStore = function (_Emitter) {
     if ('string' == typeof key) {
       if (key.charAt(0) == '/') key = key.slice(1);
 
-      // Handle links
-      if (key in this._links) key = this._links[key];
-
-      var handler = keys.first(key);
+      var namespace = keys.first(key);
       // Remove leading '_'
       var publicMethod = method.slice(1);
 
       // Route to handler if it exists
-      if (handler && this._handlers && this._handlers[publicMethod] && handler in this._handlers[publicMethod]) {
-        var _handlers$publicMetho;
+      if (namespace && namespace in this._handlers[method]) {
+        var _handlers$method$name = this._handlers[method][namespace];
+        var handler = _handlers$method$name.handler;
+        var scopedMethod = _handlers$method$name.scopedMethod;
 
-        return (_handlers$publicMetho = this._handlers[publicMethod])[handler].apply(_handlers$publicMetho, [this, this[method], key].concat(rest));
+
+        return handler.apply(undefined, [this, scopedMethod, keys.slice(key, 1)].concat(rest));
       }
       return this[method].apply(this, [key].concat(rest));
     }
@@ -251,7 +282,7 @@ var DataStore = function (_Emitter) {
       return;
     }
 
-    // Array of keys (get, load)
+    // Array of keys (get)
     if (Array.isArray(key)) {
       return key.map(function (k) {
         return _this3._route.apply(_this3, [method, k].concat(rest));
@@ -274,25 +305,12 @@ var DataStore = function (_Emitter) {
 
     // Check expiry
     if (Array.isArray(value)) {
-      value.forEach(this._checkExpiry, this);
+      value.forEach(checkExpiry);
     } else {
-      this._checkExpiry(value);
+      checkExpiry(value);
     }
 
     return value;
-  };
-
-  /**
-   * Check if 'value' is expired
-   * @param {Object} value
-   */
-
-
-  DataStore.prototype._checkExpiry = function _checkExpiry(value) {
-    if (value && value.expires && time.now() > value.expires) {
-      value.expired = true;
-      value.expires = 0;
-    }
   };
 
   /**
@@ -300,10 +318,9 @@ var DataStore = function (_Emitter) {
    * @param {String} key
    * @param {Object} value
    * @param {Object} [options]
-   *  - immutable {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
+   *  - {Boolean} immutable
+   *  - {Boolean} reference
+   *  - {Boolean} merge
    * @returns {Object}
    */
 
@@ -321,8 +338,8 @@ var DataStore = function (_Emitter) {
       // Handle removal of key
       if ('string' == typeof key && value == null) return this._unset(key);
 
-      // Store serialisability
-      if ('serialisable' in options) this.setSerialisable(key, options.serialisable);
+      // Write reference key
+      if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
 
       if (options.immutable) {
         // Returns null if no change
@@ -338,10 +355,7 @@ var DataStore = function (_Emitter) {
       }
 
       // Handle persistence
-      // Allow options to override global config
-      if ('persistent' in options && options.persistent || ~this._storage.namespaces.indexOf(key) || ~this._storage.namespaces.indexOf(keys.first(key))) {
-        this._persist(key);
-      }
+      if ('persistent' in options && options.persistent) this._persist(key);
     }
 
     return value;
@@ -368,19 +382,11 @@ var DataStore = function (_Emitter) {
 
         _this4.debug('unset "%s"', key);
         delete data[k];
-        // Prune dead links
-        for (var toKey in _this4._links) {
-          if (_this4._links[toKey] == key) {
-            delete _this4._links[toKey];
-          }
-        }
 
         // Prune from storage
-        if (~_this4._storage.namespaces.indexOf(key) || ~_this4._storage.namespaces.indexOf(keys.first(key))) {
-          _this4._unpersist(key);
-        }
+        _this4._unpersist(key);
 
-        // Delay to prevent race condition (view render)
+        // Delay to prevent race condition
         clock.immediate(function () {
           _this4.emit('unset:' + key, null, oldValue);
           _this4.emit('unset', key, null, oldValue);
@@ -395,27 +401,30 @@ var DataStore = function (_Emitter) {
    * @param {String} key
    * @param {Object} value
    * @param {Object} options
-   *  - immutable {Boolean}
-   *  - reference {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
+   *  - {Boolean} reference
+   *  - {Boolean} merge
    */
 
 
-  DataStore.prototype._update = function _update(key, value) {
-    for (var _len2 = arguments.length, args = Array(_len2 > 3 ? _len2 - 3 : 0), _key2 = 3; _key2 < _len2; _key2++) {
-      args[_key2 - 3] = arguments[_key2];
+  DataStore.prototype._update = function _update(key, value, options) {
+    for (var _len3 = arguments.length, args = Array(_len3 > 3 ? _len3 - 3 : 0), _key3 = 3; _key3 < _len3; _key3++) {
+      args[_key3 - 3] = arguments[_key3];
     }
 
     var _this5 = this;
 
-    var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    options = options || {};
 
     if (this.writable) {
       (function () {
+        // Resolve reference keys (use reference key to write to original object)
+        var parent = _this5.get(keys.slice(key, 0, -1));
+
+        if (parent && parent.__ref) key = keys.join(parent.__ref, keys.last(key));
+
         _this5.debug('update %s', key);
         var oldValue = _this5.get(key);
+        // TODO: bail if no oldValue?
 
         options.immutable = true;
         _this5.set(key, value, options);
@@ -430,102 +439,81 @@ var DataStore = function (_Emitter) {
   };
 
   /**
-   * Create link between 'fromKey' and 'toKey' keys
-   * @param {String} fromKey
-   * @param {String} toKey
-   * @returns {Object}
-   */
-
-
-  DataStore.prototype._link = function _link(fromKey, toKey) {
-    this._links[toKey] = fromKey;
-    return this.get(fromKey);
-  };
-
-  /**
    * Load data from 'url' and store at 'key'
    * @param {String} key
    * @param {String} url
    * @param {Object} [options]
-   *  - abort {Boolean}
-   *  - ignoreQuery {Boolean}
-   *  - immutable {Boolean}
-   *  - isReload {Boolean}
-   *  - reference {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
    * @returns {Response}
    */
 
 
-  DataStore.prototype._load = function _load(key, url) {
+  DataStore.prototype._load = function _load(key, url, options) {
     var _this6 = this;
 
-    var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    options = options || {};
+    options.id = this.uid;
 
-    var req = agent.get(url, options);
+    this.debug('load %s from %s', key, url);
 
-    if (!this._loading.active[key]) {
-      this.debug('load %s from %s', key, url);
+    return agent.get(url, options).timeout(this._loading.timeout).retry(this._loading.retry).then(function (res) {
+      _this6.debug('loaded "%s" in %dms', key, res.duration);
 
-      this._loading.active[key] = true;
+      var value = void 0;
 
-      req.timeout(this._loading.timeout).retry(this._loading.retry).end(function (err, res) {
-        delete _this6._loading.active[key];
+      // Guard against empty data
+      if (res.body) {
+        // TODO: make more generic with bodyParser option/handler
+        // Handle locations results separately
+        var data = 'totalResults' in res.body ? res.body._embedded && res.body._embedded.location || [] : res.body;
 
-        if (err) {
-          _this6.debug('remote resource "%s" not found at %s', key, url);
-          // Remove if no longer found
-          if (err.status < 500) _this6.unset(key);
-        } else {
+        // Add expires header
+        if (res.headers && 'expires' in res.headers) {
           (function () {
-            _this6.debug('loaded "%s" in %dms', key, res.duration);
+            var expires = getExpiry(res.headers.expires, _this6._loading.expiry);
 
-            var expires = 0;
-            var value = void 0;
-
-            // Guard against empty data
-            if (res.body) {
-              // Handle locations results separately
-              var data = 'totalResults' in res.body ? res.body._embedded && res.body._embedded.location || [] : res.body;
-
-              // Add expires header
-              if (res.headers && 'expires' in res.headers) {
-                expires = getExpiry(res.headers.expires, _this6._loading.defaultExpiry);
-
-                if (Array.isArray(data)) {
-                  data.forEach(function (d) {
-                    if (isPlainObject(d)) {
-                      d.expires = expires;
-                      d.expired = false;
-                    }
-                  });
-                } else {
-                  data.expires = expires;
-                  data.expired = false;
+            if (Array.isArray(data)) {
+              data.forEach(function (d) {
+                if (isPlainObject(d)) {
+                  d.expires = expires;
+                  d.expired = false;
                 }
-              }
-              value = _this6.set(key, data, options);
-            }
-
-            _this6.emit('load:' + key, value);
-            _this6.emit('load', key, value);
-            if (options.isReload) {
-              _this6.emit('reload:' + key, value);
-              _this6.emit('reload', key, value);
+              });
+            } else {
+              data.expires = expires;
+              data.expired = false;
             }
           })();
         }
 
-        // Allow options to override global config
-        if ('reload' in options && options.reload || ~_this6._loading.namespaces.indexOf(key) || ~_this6._loading.namespaces.indexOf(keys.first(key))) {
-          _this6._reload(key, url, options);
+        // Guard against parse errors during set()
+        try {
+          // Merge with existing
+          options.merge = true;
+          // All remote data stored with reference key
+          options.reference = true;
+          value = _this6.set(key, data, options);
+        } catch (err) {
+          _this6.debug('failed to store remote resource "%s" from %s', key, url);
+          // TODO: update error message?
+          err.status = 500;
+          throw err;
         }
-      });
-    }
+      }
 
-    return req;
+      _this6.emit('load:' + key, value);
+      _this6.emit('load', key, value);
+
+      return res;
+    })['catch'](function (err) {
+      _this6.debug('unable to load "%s" from %s', key, url);
+
+      // Remove if not found or malformed (but not aborted)
+      if (err.status < 499) _this6.remove(key);
+
+      throw err;
+    });
   };
 
   /**
@@ -533,44 +521,99 @@ var DataStore = function (_Emitter) {
    * @param {String} key
    * @param {String} url
    * @param {Object} [options]
-   *  - abort {Boolean}
-   *  - ignoreQuery {Boolean}
-   *  - immutable {Boolean}
-   *  - isReload {Boolean}
-   *  - reference {Boolean}
-   *  - reload {Boolean}
-   *  - serialisable {Boolean}
-   *  - merge {Boolean}
-   * @returns {null}
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
+   *  - {Boolean} reload
    */
 
 
   DataStore.prototype._reload = function _reload(key, url, options) {
     var _this7 = this;
 
-    // Already expired
-    if (this.get(key + '/expired')) return this.load(key, url, options);
+    options = options || {};
+    if (!options.reload) return;
 
-    var duration = (this.get(key + '/expires') || 0) - time.now();
+    var reload = function reload() {
+      _this7._load(key, url, options).then(function (res) {
+        var value = _this7.get(key);
 
-    // Guard against invalid duration (reload on error with old or missing expiry, etc)
-    if (duration <= 0) duration = this._loading.defaultExpiry;
+        _this7.emit('reload:' + key, value);
+        _this7.emit('reload', key, value);
+        _this7._reload(key, url, options);
+      })['catch'](function (err) {
+        // TODO: error never logged
+        _this7.debug('unable to reload "%s" from %s', key, url);
+        _this7._reload(key, url, options);
+      });
+    };
+    var value = this.get(key);
+    // Guard against invalid duration
+    var duration = Math.max((value && value.expires || 0) - time.now(), this._loading.expiry);
 
-    options = assign({}, options, { isReload: true });
     this.debug('reloading "%s" in %dms', key, duration);
-    clock.timeout(duration, function () {
-      _this7.load(key, url, options);
-    }, key);
+    // Set custom id
+    clock.timeout(duration, reload, url);
   };
 
   /**
-   * Cancel any existing reload timeouts
+   * Fetch data. If expired, load from 'url' and store at 'key'
    * @param {String} key
+   * @param {String} url
+   * @param {Object} [options]
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
+   *  - {Boolean} reload
+   *  - {Boolean} staleWhileRevalidate
+   *  - {Boolean} staleWhileError
+   * @returns {Promise}
    */
 
 
-  DataStore.prototype._cancelReload = function _cancelReload(key) {
-    clock.cancel(key);
+  DataStore.prototype._fetch = function _fetch(key, url, options) {
+    var _this8 = this;
+
+    options = options || {};
+
+    this.debug('fetch %s from %s', key, url);
+
+    // Set expired state
+    var value = this.get(key);
+
+    // Load if not found or expired
+    if (!value || value.expired) {
+      var load = new Promise(function (resolve, reject) {
+        _this8._load(key, url, options).then(function (res) {
+          // Schedule a reload
+          _this8._reload(key, url, options);
+          resolve({
+            duration: res.duration,
+            headers: res.headers,
+            data: _this8.get(key)
+          });
+        })['catch'](function (err) {
+          // Schedule a reload if error
+          if (err.status >= 500) _this8._reload(key, url, options);
+          resolve({
+            duration: 0,
+            error: err,
+            headers: { status: err.status },
+            data: options.staleWhileError ? value : null
+          });
+        });
+      });
+
+      // Wait for load unless stale and staleWhileRevalidate
+      if (!(value && options.staleWhileRevalidate)) return load;
+    }
+
+    // Schedule a reload
+    this._reload(key, url, options);
+    // Return data (possibly stale)
+    return Promise.resolve({
+      duration: 0,
+      headers: { status: 200 },
+      data: value
+    });
   };
 
   /**
@@ -580,9 +623,12 @@ var DataStore = function (_Emitter) {
 
 
   DataStore.prototype._persist = function _persist(key) {
+    var _this9 = this;
+
     if (this._storage.store) {
-      key = this.getStorageKey(key);
-      this._storage.store.set(key, this.toJSON(key));
+      this.getStorageKeys(key).forEach(function (storageKey) {
+        _this9._storage.store.set(storageKey, _this9._get(storageKey));
+      });
     }
   };
 
@@ -593,8 +639,12 @@ var DataStore = function (_Emitter) {
 
 
   DataStore.prototype._unpersist = function _unpersist(key) {
+    var _this10 = this;
+
     if (this._storage.store) {
-      this._storage.store.remove(this.getStorageKey(key));
+      this.getStorageKeys(key).forEach(function (storageKey) {
+        _this10._storage.store.remove(storageKey);
+      });
     }
   };
 
@@ -642,6 +692,7 @@ var DataStore = function (_Emitter) {
   DataStore.prototype.setSerialisable = function setSerialisable(key, value) {
     if (this.isRootKey(key)) key = key.slice(1);
 
+    // Handle batch
     if (isPlainObject(key)) {
       for (var k in key) {
         this.setSerialisable(k, value);
@@ -652,11 +703,24 @@ var DataStore = function (_Emitter) {
   };
 
   /**
+   * Abort all outstanding load/reload requests
+   */
+
+
+  DataStore.prototype.abort = function abort() {
+    // TODO: return aborted urls and use in clock.cancel
+    agent.abortAll(this.uid);
+    // clock.cancelAll(this.id);
+  };
+
+  /**
    * Destroy instance
    */
 
 
   DataStore.prototype.destroy = function destroy() {
+    this.abort();
+
     // Destroy cursors
     for (var key in this._cursors) {
       this._cursors[key].destroy();
@@ -664,13 +728,11 @@ var DataStore = function (_Emitter) {
     this._cursors = {};
     this._data = {};
     this._handlers = {};
-    this._links = {};
     this._loading = {};
     this._serialisable = {};
     this._storage = {};
     this.destroyed = true;
     this.removeAllListeners();
-    clock.cancel(this.id);
   };
 
   /**
@@ -706,7 +768,7 @@ var DataStore = function (_Emitter) {
 
 
   DataStore.prototype.toJSON = function toJSON(key) {
-    if (key) return this._serialise(key, this.get(key));
+    if (key) return this._serialise(key, this._get(key));
     return this._serialise(null, this._data);
   };
 
@@ -748,19 +810,30 @@ var DataStore = function (_Emitter) {
 }(Emitter);
 
 /**
- * Retrieve expiry from 'timestamp'
- * @param {Number} timestamp
+ * Retrieve expiry from 'dateString'
+ * @param {Number} dateString
  * @param {Number} minimum
  * @returns {Number}
  */
 
 
-function getExpiry(timestamp, minimum) {
-  // Add latency overhead to compensate for transmition time
-  var expires = timestamp + DEFAULT_LATENCY;
+function getExpiry(dateString, minimum) {
+  // Add latency overhead to compensate for transmission time
+  var expires = +new Date(dateString) + DEFAULT_LATENCY;
   var now = time.now();
 
   return expires > now ? expires
   // Local clock is set incorrectly
   : now + minimum;
+}
+
+/**
+ * Check if 'value' is expired
+ * @param {Object} value
+ */
+function checkExpiry(value) {
+  if (value && isPlainObject(value) && value.expires && time.now() > value.expires) {
+    value.expired = true;
+    value.expires = 0;
+  }
 }

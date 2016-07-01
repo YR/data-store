@@ -151,14 +151,12 @@ describe('dataStore', function () {
     });
   });
 
-  describe('getStorageKeys()', function () {
-    it.skip('should return all keys if passed an empty key', function () {
-      store._storage.namespaces = ['foo'];
-      expect(store.getStorageKeys('')).to.eql(['foo/bar', 'foo/boo']);
+  describe.only('getStorageKeys()', function () {
+    it('should return all keys if passed an empty key', function () {
+      expect(store.getStorageKeys()).to.eql(['/bar', '/boo', '/foo/bar', '/foo/boo', '/bat']);
     });
     it('should return keys of a fixed length', function () {
-      store._storage.namespaces = ['foo'];
-      expect(store.getStorageKeys('foo/boo/bar')).to.eql(['foo/boo']);
+      expect(store.getStorageKeys('foo/boo/bar')).to.eql(['/foo/boo']);
     });
   });
 
