@@ -121,22 +121,22 @@ class DataStore extends Emitter {
     const options = { immutable: false };
 
     if (store) {
-      const storageData = Object.keys(property.reshape(store.get('/'), 1))
-        .map((namespace) => {
-          const value = storageData[namespace];
+      let storageData = property.reshape(store.get('/'), 1);
 
-          // Handle version mismatch
-          if (store.shouldUpgrade(namespace)) {
-            // Clear all storage data for namespace
-            for (const key in property.reshape(value, keyLength - 1)) {
-              store.remove(keys.join(namespace, key));
-            }
-            // Allow handlers to override
-            return this.upgradeStorageData(namespace, value);
+      for (const namespace in storageData) {
+        const value = storageData[namespace];
+
+        // Handle version mismatch
+        if (store.shouldUpgrade(namespace)) {
+          // Clear all storage data for namespace
+          for (const key in property.reshape(value, keyLength - 1)) {
+            store.remove(keys.join(namespace, key));
           }
-          return value;
-        });
-
+          // Allow handlers to override
+          storageData[namespace] = this.upgradeStorageData(namespace, value);
+        }
+      }
+      // TODO: persist
       this.set(storageData, options);
     }
 
@@ -554,7 +554,8 @@ class DataStore extends Emitter {
   _persist (key) {
     if (this._storage.store) {
       this.getStorageKeys(key).forEach((storageKey) => {
-        this._storage.store.set(storageKey, this._get(storageKey));
+        // Storage keys are global, so trim
+        this._storage.store.set(storageKey, this._get(storageKey.slice(1)));
       });
     }
   }
