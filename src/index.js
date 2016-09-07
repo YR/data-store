@@ -83,7 +83,7 @@ class DataStore extends Emitter {
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.uid = uuid.v4();
-    this.id = id || `store${--uid}`;
+    this.id = id || `store${--this.uid}`;
     this.writable = 'writable' in options ? options.writable : true;
 
     this._cursors = {};
@@ -216,8 +216,6 @@ class DataStore extends Emitter {
       if (key.charAt(0) == '/') key = key.slice(1);
 
       const namespace = keys.first(key);
-      // Remove leading '_'
-      const publicMethod = method.slice(1);
 
       // Route to handler if it exists
       if (namespace && namespace in this._handlers[method]) {
@@ -481,7 +479,7 @@ class DataStore extends Emitter {
     };
     const value = this.get(key);
     // Guard against invalid duration
-    const duration = Math.max((value && value.expires || 0) - time.now(), this._loading.expiry);
+    const duration = Math.max((value && value.expires || 0) - Date.now(), this._loading.expiry);
 
     this.debug('reloading "%s" in %dms', key, duration);
     // Set custom id
@@ -728,7 +726,7 @@ class DataStore extends Emitter {
 function getExpiry (dateString, minimum) {
   // Add latency overhead to compensate for transmission time
   const expires = +(new Date(dateString)) + DEFAULT_LATENCY;
-  const now = time.now();
+  const now = Date.now();
 
   return (expires > now)
     ? expires
@@ -741,7 +739,7 @@ function getExpiry (dateString, minimum) {
  * @param {Object} value
  */
 function checkExpiry (value) {
-  if (value && isPlainObject(value) && value.expires && time.now() > value.expires) {
+  if (value && isPlainObject(value) && value.expires && Date.now() > value.expires) {
     value.expired = true;
     value.expires = 0;
   }

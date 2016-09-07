@@ -9,7 +9,7 @@
     "@yr/keys": "1.1.x",
     "@yr/property": "5.0.x",
     "@yr/runtime": "1.2.x",
-    "@yr/time": "3.2.x",
+    "@yr/time": "4.0.x",
     "debug": "2.2.0",
     "eventemitter3": "1.2.0",
     "is-plain-obj": "1.1.0",
