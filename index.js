@@ -68,9 +68,8 @@ var DataStore = function (_Emitter) {
    *    - {Object} store
    *  - {Boolean} writable
    */
-
   function DataStore(id, data) {
-    var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
     babelHelpers.classCallCheck(this, DataStore);
 
     var _this = babelHelpers.possibleConstructorReturn(this, _Emitter.call(this));
@@ -78,7 +77,7 @@ var DataStore = function (_Emitter) {
     _this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     _this.destroyed = false;
     _this.uid = uuid.v4();
-    _this.id = id || 'store' + --uid;
+    _this.id = id || 'store' + --_this.uid;
     _this.writable = 'writable' in options ? options.writable : true;
 
     _this._cursors = {};
@@ -128,30 +127,32 @@ var DataStore = function (_Emitter) {
 
 
   DataStore.prototype.bootstrap = function bootstrap(storage, data) {
-    // Bootstrap data
-    var bootstrapOptions = { immutable: false };
+    var keyLength = storage.keyLength,
+        store = storage.store;
 
-    // if (storage.store) {
-    //   const { namespaces, store } = storage;
-    //   const storageData = namespaces.reduce((accumulatedStorageData, namespace) => {
-    //     let storageData = store.get(namespace);
+    var options = { immutable: false };
 
-    //     // Handle version mismatch
-    //     if (store.shouldUpgrade(namespace)) {
-    //       for (const key in storageData) {
-    //         store.remove(key);
-    //         // Allow handlers to override
-    //         storageData[key] = this.upgradeStorageData(key, storageData[key]);
-    //       }
-    //     }
+    if (store) {
+      var storageData = property.reshape(store.get('/'), 1);
 
-    //     return assign(accumulatedStorageData, storageData);
-    //   }, {});
+      for (var namespace in storageData) {
+        var value = storageData[namespace];
 
-    //   this.set(storageData, bootstrapOptions);
-    // }
+        // Handle version mismatch
+        if (store.shouldUpgrade(namespace)) {
+          // Clear all storage data for namespace
+          for (var key in property.reshape(value, keyLength - 1)) {
+            store.remove(keys.join(namespace, key));
+          }
+          // Allow handlers to override
+          storageData[namespace] = this.upgradeStorageData(namespace, value);
+        }
+      }
+      // TODO: persist
+      this.set(storageData, options);
+    }
 
-    this.set(data, bootstrapOptions);
+    this.set(data, options);
   };
 
   /**
@@ -166,15 +167,14 @@ var DataStore = function (_Emitter) {
   };
 
   /**
-   * Retrieve global version of 'key',
-   * taking account of nested status.
+   * Retrieve global version of 'key'
    * @param {String} key
    * @returns {String}
    */
 
 
   DataStore.prototype.getRootKey = function getRootKey() {
-    var key = arguments.length <= 0 || arguments[0] === undefined ? '' : arguments[0];
+    var key = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
 
     if (!this.isRootKey(key)) key = '/' + key;
     return key;
@@ -182,27 +182,29 @@ var DataStore = function (_Emitter) {
 
   /**
    * Retrieve storage keys for 'key'
-   * based on storage.keyLength.
+   * based on storage.keyLength
    * @param {String} key
    * @returns {Array}
    */
 
 
   DataStore.prototype.getStorageKeys = function getStorageKeys() {
-    var key = arguments.length <= 0 || arguments[0] === undefined ? '' : arguments[0];
+    var key = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : '';
     var keyLength = this._storage.keyLength;
 
     var length = keys.length(key);
 
     if (length < keyLength) {
-      var parentData = property.flatten(this._get(keys.slice(key, 0, -1)), keyLength - 1);
+      var parentData = property.reshape(this._get(keys.slice(key, 0, -1)), keyLength);
 
       return Object.keys(parentData).filter(function (k) {
         return k.indexOf(key) == 0;
+      }).map(function (k) {
+        return '/' + k;
       });
     }
 
-    return [keys.slice(key, 0, this._storage.keyLength)];
+    return ['/' + keys.slice(key, 0, this._storage.keyLength)];
   };
 
   /**
@@ -248,9 +250,9 @@ var DataStore = function (_Emitter) {
       args[_key2 - 1] = arguments[_key2];
     }
 
-    var _args$ = args[0];
-    var key = _args$ === undefined ? '' : _args$;
-    var rest = args.slice(1);
+    var _args$ = args[0],
+        key = _args$ === undefined ? '' : _args$,
+        rest = args.slice(1);
 
 
     if (!key) return this[method].apply(this, args);
@@ -259,14 +261,12 @@ var DataStore = function (_Emitter) {
       if (key.charAt(0) == '/') key = key.slice(1);
 
       var namespace = keys.first(key);
-      // Remove leading '_'
-      var publicMethod = method.slice(1);
 
       // Route to handler if it exists
       if (namespace && namespace in this._handlers[method]) {
-        var _handlers$method$name = this._handlers[method][namespace];
-        var handler = _handlers$method$name.handler;
-        var scopedMethod = _handlers$method$name.scopedMethod;
+        var _handlers$method$name = this._handlers[method][namespace],
+            handler = _handlers$method$name.handler,
+            scopedMethod = _handlers$method$name.scopedMethod;
 
 
         return handler.apply(undefined, [this, scopedMethod, keys.slice(key, 1)].concat(rest));
@@ -301,7 +301,7 @@ var DataStore = function (_Emitter) {
     // Return all if no key specified
     if (!key) return this._data;
 
-    var value = property.get(key, this._data);
+    var value = property.get(this._data, key);
 
     // Check expiry
     if (Array.isArray(value)) {
@@ -342,16 +342,16 @@ var DataStore = function (_Emitter) {
       if (options.reference && isPlainObject(value)) value.__ref = this.getRootKey(key);
 
       if (options.immutable) {
-        // Returns null if no change
-        var newData = property.set(key, value, this._data, options);
+        // Returns same if no change
+        var newData = property.set(this._data, key, value, options);
 
-        if (newData !== null) {
+        if (newData !== this._data) {
           this._data = newData;
         } else {
           this.debug('WARNING no change after set "%s', key);
         }
       } else {
-        property.set(key, value, this._data, options);
+        property.set(this._data, key, value, options);
       }
 
       // Handle persistence
@@ -506,7 +506,7 @@ var DataStore = function (_Emitter) {
       _this6.emit('load', key, value);
 
       return res;
-    })['catch'](function (err) {
+    }).catch(function (err) {
       _this6.debug('unable to load "%s" from %s', key, url);
 
       // Remove if not found or malformed (but not aborted)
@@ -540,7 +540,7 @@ var DataStore = function (_Emitter) {
         _this7.emit('reload:' + key, value);
         _this7.emit('reload', key, value);
         _this7._reload(key, url, options);
-      })['catch'](function (err) {
+      }).catch(function (err) {
         // TODO: error never logged
         _this7.debug('unable to reload "%s" from %s', key, url);
         _this7._reload(key, url, options);
@@ -548,7 +548,7 @@ var DataStore = function (_Emitter) {
     };
     var value = this.get(key);
     // Guard against invalid duration
-    var duration = Math.max((value && value.expires || 0) - time.now(), this._loading.expiry);
+    var duration = Math.max((value && value.expires || 0) - Date.now(), this._loading.expiry);
 
     this.debug('reloading "%s" in %dms', key, duration);
     // Set custom id
@@ -590,7 +590,7 @@ var DataStore = function (_Emitter) {
             headers: res.headers,
             data: _this8.get(key)
           });
-        })['catch'](function (err) {
+        }).catch(function (err) {
           // Schedule a reload if error
           if (err.status >= 500) _this8._reload(key, url, options);
           resolve({
@@ -627,7 +627,8 @@ var DataStore = function (_Emitter) {
 
     if (this._storage.store) {
       this.getStorageKeys(key).forEach(function (storageKey) {
-        _this9._storage.store.set(storageKey, _this9._get(storageKey));
+        // Storage keys are global, so trim
+        _this9._storage.store.set(storageKey, _this9._get(storageKey.slice(1)));
       });
     }
   };
@@ -820,7 +821,7 @@ var DataStore = function (_Emitter) {
 function getExpiry(dateString, minimum) {
   // Add latency overhead to compensate for transmission time
   var expires = +new Date(dateString) + DEFAULT_LATENCY;
-  var now = time.now();
+  var now = Date.now();
 
   return expires > now ? expires
   // Local clock is set incorrectly
@@ -832,7 +833,7 @@ function getExpiry(dateString, minimum) {
  * @param {Object} value
  */
 function checkExpiry(value) {
-  if (value && isPlainObject(value) && value.expires && time.now() > value.expires) {
+  if (value && isPlainObject(value) && value.expires && Date.now() > value.expires) {
     value.expired = true;
     value.expires = 0;
   }
