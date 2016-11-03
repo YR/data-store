@@ -127,20 +127,18 @@ class DataStore extends Emitter {
           return key.indexOf(namespace) == 0;
         });
 
-        handlers.reduce((sequence, { handler, namespace }) => {
-          return sequence.then(() => handler());
-        }, Promise.resolve([]));
+
       }
 
-      const namespace = keys.first(key);
+      // const namespace = keys.first(key);
 
-      // Route to handler if it exists
-      if (namespace && namespace in this._handlers[privateMethodName]) {
-        const { handler, scopedMethod } = this._handlers[privateMethodName][namespace];
+      // // Route to handler if it exists
+      // if (namespace && namespace in this._handlers[privateMethodName]) {
+      //   const { handler, scopedMethod } = this._handlers[privateMethodName][namespace];
 
-        return handler(this, scopedMethod, keys.slice(key, 1), ...rest);
-      }
-      return this[privateMethodName](key, ...rest);
+      //   return handler(this, scopedMethod, keys.slice(key, 1), ...rest);
+      // }
+      // return this[privateMethodName](key, ...rest);
     }
 
     // Batch (set, update, load, etc)
