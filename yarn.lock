@@ -32,12 +32,6 @@
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@yr/runtime/-/runtime-2.0.0.tgz#500e2d49fa0d9dac57293b6a183dd5a353a371c3"
 
-"@yr/time@4.0.x":
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/@yr/time/-/time-4.0.0.tgz#939c7c0102ddbd59fb85de031374ad3f99c53f64"
-  dependencies:
-    is-plain-obj "1.1.x"
-
 align-text@^0.1.1, align-text@^0.1.3:
   version "0.1.4"
   resolved "https://registry.yarnpkg.com/align-text/-/align-text-0.1.4.tgz#0cd90a561093f35d0a99256c22b7069433fad117"
@@ -581,8 +575,8 @@ camelcase@^1.0.2:
   resolved "https://registry.yarnpkg.com/camelcase/-/camelcase-1.2.1.tgz#9bb5304d2e0b56698b2c758b08a3eaa9daa58a39"
 
 caniuse-db@^1.0.30000539, caniuse-db@^1.0.30000554:
-  version "1.0.30000572"
-  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000572.tgz#81d0aa6b7de2d785c8dcab135502983276cc707d"
+  version "1.0.30000574"
+  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000574.tgz#4b10fb5435c50262effd10653405befd0d0bfc2c"
 
 center-align@^0.1.1:
   version "0.1.3"
@@ -1727,10 +1721,6 @@ uniqs@^2.0.0:
 util-deprecate@~1.0.1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
-
-uuid@2.0.3:
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-2.0.3.tgz#67e2e863797215530dff318e5bf9dcebfd47b21a"
 
 vendors@^1.0.0:
   version "1.0.1"

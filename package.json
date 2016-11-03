@@ -9,12 +9,10 @@
     "@yr/keys": "1.1.x",
     "@yr/property": "5.1.x",
     "@yr/runtime": "2.0.x",
-    "@yr/time": "4.0.x",
     "debug": "2.2.0",
     "eventemitter3": "2.0.2",
     "is-plain-obj": "1.1.0",
-    "object-assign": "4.1.0",
-    "uuid": "2.0.3"
+    "object-assign": "4.1.0"
   },
   "devDependencies": {
     "babel-plugin-syntax-trailing-function-commas": "6.13.0",
