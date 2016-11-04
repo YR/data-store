@@ -36,7 +36,7 @@
     "babel-plugin-transform-es2015-unicode-regex": "6.11.0",
     "babel-plugin-transform-es5-property-mutators": "6.8.0",
     "babel-plugin-transform-exponentiation-operator": "6.8.0",
-    "buddy": "6.3.x",
+    "buddy": "6.x.x",
     "expect.js": "*",
     "mocha": "*",
     "nock": "*"
@@ -46,8 +46,7 @@
   "license": "MIT",
   "scripts": {
     "prepublish": "buddy build",
-    "test": "NODE_ENV=test mocha test/lib-test.js --reporter spec",
-    "test-client": "buddy build && mocha-phantomjs test/test-runner.html"
+    "test": "NODE_ENV=test mocha test/test.js --reporter spec --bail"
   },
   "browser": "index.js",
   "buddy": {
@@ -57,10 +56,6 @@
         "output": ".",
         "bundle": false,
         "version": "es5"
-      },
-      {
-        "input": "src/index.js",
-        "output": "test/lib.js"
       }
     ]
   }

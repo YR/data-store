@@ -18,8 +18,8 @@
     raf "3.2.0"
 
 "@yr/keys@1.1.x":
-  version "1.1.2"
-  resolved "https://registry.yarnpkg.com/@yr/keys/-/keys-1.1.2.tgz#e51ad58406a3faec011654cc8abe633ee6ee9564"
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/@yr/keys/-/keys-1.1.3.tgz#0d5060a5ba77f78fbdfe8670ee9bd54a9cf26713"
 
 "@yr/property@5.1.x":
   version "5.1.1"
@@ -99,33 +99,9 @@ babel-code-frame@^6.16.0:
     esutils "^2.0.2"
     js-tokens "^2.0.0"
 
-babel-core@^6.18.0:
+babel-core@^6.18.0, babel-core@6.18.2:
   version "6.18.2"
   resolved "https://registry.yarnpkg.com/babel-core/-/babel-core-6.18.2.tgz#d8bb14dd6986fa4f3566a26ceda3964fa0e04e5b"
-  dependencies:
-    babel-code-frame "^6.16.0"
-    babel-generator "^6.18.0"
-    babel-helpers "^6.16.0"
-    babel-messages "^6.8.0"
-    babel-register "^6.18.0"
-    babel-runtime "^6.9.1"
-    babel-template "^6.16.0"
-    babel-traverse "^6.18.0"
-    babel-types "^6.18.0"
-    babylon "^6.11.0"
-    convert-source-map "^1.1.0"
-    debug "^2.1.1"
-    json5 "^0.5.0"
-    lodash "^4.2.0"
-    minimatch "^3.0.2"
-    path-is-absolute "^1.0.0"
-    private "^0.1.6"
-    slash "^1.0.0"
-    source-map "^0.5.0"
-
-babel-core@6.18.0:
-  version "6.18.0"
-  resolved "https://registry.yarnpkg.com/babel-core/-/babel-core-6.18.0.tgz#bb5ce9bc0a956e6e94e2f12d597abb3b0b330deb"
   dependencies:
     babel-code-frame "^6.16.0"
     babel-generator "^6.18.0"
@@ -541,13 +517,13 @@ buddy-cli@6.0.4:
     commander "2.9.0"
     recur-fs "2.2.x"
 
-buddy@6.3.x:
-  version "6.3.0"
-  resolved "https://registry.yarnpkg.com/buddy/-/buddy-6.3.0.tgz#5d36b316b762efd98e5f8f0ca1c2696f5d9a1d8e"
+buddy@6.x.x:
+  version "6.3.1"
+  resolved "https://registry.yarnpkg.com/buddy/-/buddy-6.3.1.tgz#e94658a9b43b610337b4534cbb4ddc86722ac4c1"
   dependencies:
     async "2.1.2"
     autoprefixer "6.5.1"
-    babel-core "6.18.0"
+    babel-core "6.18.2"
     babel-plugin-external-helpers "6.18.0"
     babel-plugin-transform-es2015-modules-commonjs "6.18.0"
     browserslist "1.4.0"
