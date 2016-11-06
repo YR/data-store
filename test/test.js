@@ -111,7 +111,7 @@ describe('dataStore', function () {
       expect(store._data.boop).to.have.property('bar', 'foo');
     });
     it('should do nothing if dataStore is not writable', function () {
-      store.writable = false;
+      store.isWritable = false;
       store.set('foo', 'bar');
       expect(store._data.foo).to.not.equal('bar');
     });
@@ -201,8 +201,8 @@ describe('dataStore', function () {
       });
       store.update(obj, undefined, 'foo');
     });
-    it('should be ignored if dataStore is not "writable"', function () {
-      store.writable = false;
+    it('should be ignored if dataStore is not "isWritable"', function () {
+      store.isWritable = false;
       store.update('bar', 'bar');
       expect(store.get('bar')).to.not.equal('bar');
     });
