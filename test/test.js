@@ -629,7 +629,7 @@ describe('FetchableDataStore', function () {
     it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
       store.set('foo/__expires', 0);
       return store
-        .fetch('foo', { url: 'http://localhost/foo', staleWhileRevalidate: true })
+        .fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true })
         .then((value) => {
           expect(value.data).to.not.have.property('foo');
         });
@@ -640,7 +640,7 @@ describe('FetchableDataStore', function () {
         .reply(200, { foo: 'foo' });
       store.set('foo/__expires', 0);
       return store
-        .fetch('foo', { url: 'http://localhost/foo', staleWhileRevalidate: false })
+        .fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false })
         .then((value) => {
           expect(value.data).to.have.property('foo', 'foo');
         });
@@ -651,7 +651,7 @@ describe('FetchableDataStore', function () {
         .reply(500);
 
       return store
-        .fetch('beep', { url: 'http://localhost/beep', retry: 0, timeout: 10 })
+        .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
         .then((value) => {
           expect(value.data).to.equal(null);
           expect(value.headers.status).to.equal(500);
@@ -663,7 +663,7 @@ describe('FetchableDataStore', function () {
         .delayConnection(100)
         .reply(200, { beep: 'beep' });
 
-      store.fetch('beep', { url: 'http://localhost/beep', retry: 0, timeout: 10 })
+      store.fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
         .then((value) => {
           expect(value.data).to.equal(null);
           expect(value.headers.status).to.equal(499);
@@ -680,7 +680,7 @@ describe('FetchableDataStore', function () {
         .get('/beep')
         .reply(200, { beep: 'bar' });
 
-      store.fetch('beep', { url: 'http://localhost/beep', reload: true, retry: 0, timeout: 10, minExpiry: 75 })
+      store.fetch('beep', 'http://localhost/beep', { reload: true, retry: 0, timeout: 10, minExpiry: 75 })
         .then((value) => {
           expect(store.get('beep')).to.have.property('beep', 'foo');
           setTimeout(() => {
@@ -699,7 +699,7 @@ describe('FetchableDataStore', function () {
         .get('/beep')
         .reply(200, { beep: 'bar' });
 
-      store.fetch('beep', { url: 'http://localhost/beep', reload: true, retry: 0, timeout: 10, minExpiry: 75 })
+      store.fetch('beep', 'http://localhost/beep', { reload: true, retry: 0, timeout: 10, minExpiry: 75 })
         .then((value) => {
           expect(value.data).to.equal(null);
           setTimeout(() => {

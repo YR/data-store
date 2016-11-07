@@ -31,8 +31,9 @@ module.exports = class FetchableDataStore extends DataStore {
   }
 
   /**
-   * Fetch data. If expired, load and store at 'key'
+   * Fetch data. If expired, load from 'url' and store at 'key'
    * @param {String} key
+   * @param {String} url
    * @param {Object} options
    *  - {Boolean} abort
    *  - {Boolean} ignoreQuery
@@ -42,17 +43,16 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Boolean} staleWhileRevalidate
    *  - {Boolean} staleIfError
    *  - {Number} timeout
-   *  - {String} url
    * @returns {Promise}
    */
-  _fetch (key, options = {}) {
-    const { reload, staleWhileRevalidate, staleIfError, url } = options;
+  _fetch (key, url, options = {}) {
+    const { reload, staleWhileRevalidate, staleIfError } = options;
 
     const value = this.get(key);
     const isMissingOrExpired = !value || hasExpired(value);
 
     // Load if missing or expired
-    if (url && isMissingOrExpired) {
+    if (isMissingOrExpired) {
       this.debug('fetch %s from %s', key, url);
 
       const load = new Promise((resolve, reject) => {
@@ -83,7 +83,7 @@ module.exports = class FetchableDataStore extends DataStore {
     }
 
     // Schedule a reload
-    if (url && reload) this._reload(key, url, options);
+    if (reload) this._reload(key, url, options);
     // Return data (possibly stale)
     return Promise.resolve({
       duration: 0,
