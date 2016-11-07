@@ -3,7 +3,7 @@
 const agent = require('@yr/agent');
 const assign = require('object-assign');
 const clock = require('@yr/clock');
-const DataStore = require('./lib/DataStore');
+const DataStore = require('./DataStore');
 const isPlainObject = require('is-plain-obj');
 
 const DEFAULT_LOAD_OPTIONS = {

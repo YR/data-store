@@ -9,7 +9,7 @@
 
 const assign = require('object-assign');
 const clock = require('@yr/clock');
-const Cursor = require('./lib/cursor');
+const Cursor = require('./cursor');
 const Debug = require('debug');
 const Emitter = require('eventemitter3');
 const isPlainObject = require('is-plain-obj');
