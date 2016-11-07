@@ -11,6 +11,7 @@ const DEFAULT_LOAD_OPTIONS = {
   retry: 2,
   timeout: 5000
 };
+const EXPIRES_PROPERTY = '__expires';
 const GRACE = 10000;
 
 module.exports = class FetchableDataStore extends DataStore {
@@ -44,16 +45,14 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {String} url
    * @returns {Promise}
    */
-  _fetch (key, options) {
+  _fetch (key, options = {}) {
     const { reload, staleWhileRevalidate, staleIfError, url } = options;
-
-    if (!url) throw Error(`missing url for fetch of ${key}`);
 
     const value = this.get(key);
     const isMissingOrExpired = !value || hasExpired(value);
 
     // Load if missing or expired
-    if (isMissingOrExpired) {
+    if (url && isMissingOrExpired) {
       this.debug('fetch %s from %s', key, url);
 
       const load = new Promise((resolve, reject) => {
@@ -84,7 +83,7 @@ module.exports = class FetchableDataStore extends DataStore {
     }
 
     // Schedule a reload
-    if (reload) this._reload(key, url, options);
+    if (url && reload) this._reload(key, url, options);
     // Return data (possibly stale)
     return Promise.resolve({
       duration: 0,
@@ -108,7 +107,7 @@ module.exports = class FetchableDataStore extends DataStore {
   _load (key, url, options) {
     options = assign({}, DEFAULT_LOAD_OPTIONS, options);
     // TODO: more granular id needed
-    options.id = this.uid;
+    options.id = url;
 
     this.debug('load %s from %s', key, url);
 
@@ -127,7 +126,7 @@ module.exports = class FetchableDataStore extends DataStore {
 
           // Add expires header
           if (res.headers && 'expires' in res.headers) {
-            data.expires = getExpiry(res.headers.expires, options.minExpiry);
+            data[EXPIRES_PROPERTY] = getExpiry(res.headers.expires, options.minExpiry);
           }
 
           value = this.set(key, data, options);
@@ -179,9 +178,8 @@ module.exports = class FetchableDataStore extends DataStore {
     };
     const value = this.get(key);
     // Guard against invalid duration
-    const duration = Math.max((value && value.expires || 0) - Date.now(), options.minExpiry);
+    const duration = Math.max((value && value[EXPIRES_PROPERTY] || 0) - Date.now(), options.minExpiry);
 
-    this.debug('reloading "%s" in %dms', key, duration);
     // TODO: set id
     clock.timeout(duration, reload, url);
   }
@@ -212,8 +210,8 @@ function getExpiry (dateString, minimum) {
 function hasExpired (obj) {
   return obj
     && isPlainObject(obj)
-    && 'expires' in obj
-    && Date.now() > obj.expires;
+    && EXPIRES_PROPERTY in obj
+    && Date.now() > obj[EXPIRES_PROPERTY];
 }
 
 

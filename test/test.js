@@ -1,9 +1,9 @@
 'use strict';
 
+const agent = require('@yr/agent');
 const expect = require('expect.js');
 const nock = require('nock');
 const Store = require('../src/index');
-const time = require('@yr/time');
 
 const storage = {
   _storage: {},
@@ -35,11 +35,7 @@ const storage = {
 };
 let fake, store;
 
-describe('dataStore', function () {
-  before(function () {
-    storage.clear();
-    storage.init();
-  });
+describe('DataStore', function () {
   beforeEach(function () {
     store = Store.create('store', {
       bar: 'bat',
@@ -54,7 +50,6 @@ describe('dataStore', function () {
     });
   });
   afterEach(function () {
-    storage.clear();
     store.destroy();
   });
 
@@ -453,6 +448,14 @@ describe('dataStore', function () {
     });
 
     describe.skip('persistance', function () {
+      before(function () {
+        storage.clear();
+        storage.init();
+      });
+      afterEach(function () {
+        storage.clear();
+      });
+
       describe('getStorageKeys()', function () {
         it('should return all keys if passed an empty key', function () {
           expect(store.getStorageKeys()).to.eql(['/bar', '/boo', '/foo/bar', '/foo/boo', '/bat']);
@@ -521,76 +524,223 @@ describe('dataStore', function () {
         });
       });
     });
+  });
+});
 
-    describe.skip('loading', function () {
-      describe('get()', function () {
-        it('should flag expired objects', function () {
-          const c = Store.create('zing', { bing: { expires: +time.create().subtract(1, 'day') } });
+describe('FetchableDataStore', function () {
+  beforeEach(function () {
+    store = Store.create('store', {
+      bar: 'bat',
+      boo: 'foo',
+      foo: {
+        bar: 'boo',
+        boo: {
+          bar: 'foo'
+        }
+      },
+      bat: ['foo', 'bar']
+    }, { isFetchable: true });
+  });
+  afterEach(function () {
+    store.destroy();
+  });
 
-          expect(c.get('bing')).to.have.property('expired', true);
-          expect(c.get('bing')).to.have.property('expires', 0);
-        });
-      });
+  describe('_load()', function () {
+    beforeEach(function () {
+      fake = nock('http://localhost');
+    });
+    afterEach(function () {
+      nock.cleanAll();
+    });
 
-      describe('load()', function () {
-        beforeEach(function () {
-          fake = nock('http://localhost');
+    it('should load and store data for "key"', function () {
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' });
+      return store._load('foo', 'http://localhost/foo')
+        .then((res) => {
+          expect(store.get('foo')).to.have.property('foo', 'foo');
         });
-        afterEach(function () {
-          nock.cleanAll();
-        });
+    });
+    it('should load and store data for "key" with expires header value', function () {
+      const d = new Date();
 
-        it('should load and store data for "key"', function () {
-          fake
-            .get('/foo')
-            .reply(200, { foo: 'foo' });
-          return store.load('foo', 'http://localhost/foo')
-            .then((res) => {
-              expect(store.get('foo')).to.have.property('foo', 'foo');
-            });
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' }, { expires: d.toUTCString() });
+      return store._load('foo', 'http://localhost/foo')
+        .then((res) => {
+          expect(store.get('foo')).to.have.property('__expires');
         });
-        it('should load and store data for "key" with "options"', function () {
-          fake
-            .get('/foo')
-            .reply(200, { foo: 'foo' });
-          return store.load('foo', 'http://localhost/foo', { reference: true })
-            .then((res) => {
-              expect(store.get('foo').foo).to.eql('foo');
-              expect(store.get('foo').__ref).to.equal('/foo');
-            });
-        });
-      });
+    });
+  });
 
-      describe('reload()', function () {
-        it('should load "key" if already expired', function (done) {
-          nock('http://localhost')
-            .get('/foo')
-            .reply(200, { foo: 'bar' });
-          expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
-          store.set('foo/expired', true);
-          store.reload('foo', 'http://localhost/foo');
+  describe('_reload()', function () {
+    beforeEach(function () {
+      fake = nock('http://localhost');
+    });
+    afterEach(function () {
+      nock.cleanAll();
+    });
+
+    it('should load "key" if already expired', function (done) {
+      fake
+        .get('/foo')
+        .times(2)
+        .reply(200, { foo: 'bar' });
+      expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
+      store.set('foo/__expires', Date.now() + 50);
+      store._reload('foo', 'http://localhost/foo', { minExpiry: 40 });
+      setTimeout(() => {
+        expect(store.get('foo')).to.have.property('foo', 'bar');
+        done();
+      }, 100);
+    });
+    it('should load "key" with default duration if invalid "expires"', function (done) {
+      fake
+        .get('/foo')
+        .times(2)
+        .reply(200, { foo: 'bar' });
+      expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
+      store.set('foo/__expires', 0);
+      store._reload('foo', 'http://localhost/foo', { minExpiry: 75 });
+      setTimeout(() => {
+        expect(store.get('foo')).to.have.property('foo', 'bar');
+        done();
+      }, 100);
+    });
+  });
+
+  describe('fetch()', function () {
+    beforeEach(function () {
+      fake = nock('http://localhost');
+    });
+    afterEach(function () {
+      nock.cleanAll();
+    });
+
+    it('should return a Promise with the value', function () {
+      return store
+        .fetch('bar')
+        .then((value) => {
+          expect(value.data).to.equal('bat');
+        });
+    });
+    it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
+      store.set('foo/__expires', 0);
+      return store
+        .fetch('foo', { url: 'http://localhost/foo', staleWhileRevalidate: true })
+        .then((value) => {
+          expect(value.data).to.not.have.property('foo');
+        });
+    });
+    it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', function () {
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' });
+      store.set('foo/__expires', 0);
+      return store
+        .fetch('foo', { url: 'http://localhost/foo', staleWhileRevalidate: false })
+        .then((value) => {
+          expect(value.data).to.have.property('foo', 'foo');
+        });
+    });
+    it('should return a Promise when failure loading', function () {
+      fake
+        .get('/beep')
+        .reply(500);
+
+      return store
+        .fetch('beep', { url: 'http://localhost/beep', retry: 0, timeout: 10 })
+        .then((value) => {
+          expect(value.data).to.equal(null);
+          expect(value.headers.status).to.equal(500);
+        });
+    });
+    it('should return a Promise when loading aborted', function (done) {
+      fake
+        .get('/beep')
+        .delayConnection(100)
+        .reply(200, { beep: 'beep' });
+
+      store.fetch('beep', { url: 'http://localhost/beep', retry: 0, timeout: 10 })
+        .then((value) => {
+          expect(value.data).to.equal(null);
+          expect(value.headers.status).to.equal(499);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      agent.abortAll();
+    });
+    it('should reload "key" after expiry with "options.reload = true"', function (done) {
+      fake
+        .get('/beep')
+        .reply(200, { beep: 'foo' }, { expires: 0 })
+        .get('/beep')
+        .reply(200, { beep: 'bar' });
+
+      store.fetch('beep', { url: 'http://localhost/beep', reload: true, retry: 0, timeout: 10, minExpiry: 75 })
+        .then((value) => {
+          expect(store.get('beep')).to.have.property('beep', 'foo');
           setTimeout(() => {
-            expect(store.get('foo')).to.have.property('foo', 'bar');
+            expect(store.get('beep')).to.have.property('beep', 'bar');
             done();
           }, 100);
+        })
+        .catch((err) => {
+          done(err);
         });
-        it('should load "key" with default duration if invalid "expires"', function (done) {
-          nock('http://localhost')
-            .get('/foo')
-            .reply(200, { foo: 'bar' });
-          expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
-          store.set('foo/expires', 1000);
-          store.reload('foo', 'http://localhost/foo');
+    });
+    it('should reload "key" after error', function (done) {
+      fake
+        .get('/beep')
+        .reply(500)
+        .get('/beep')
+        .reply(200, { beep: 'bar' });
+
+      store.fetch('beep', { url: 'http://localhost/beep', reload: true, retry: 0, timeout: 10, minExpiry: 75 })
+        .then((value) => {
+          expect(value.data).to.equal(null);
           setTimeout(() => {
-            expect(store.get('foo')).to.have.property('foo', 'bar');
+            expect(store.get('beep')).to.have.property('beep', 'bar');
             done();
-          }, 1200);
+          }, 100);
+        })
+        .catch((err) => {
+          done(err);
         });
-      });
+    });
+    it.skip('should cancel existing reload of "key" when loading new "key"', function (done) {
+      fake
+        .get('/beep')
+        .reply(200, { foo: 'foo' }, { expires: 0 })
+        .get('/beep')
+        .reply(200, { foo: 'bar' })
+        .get('/bop')
+        .reply(200, { bar: 'bar' }, { expires: 0 });
 
-      describe('fetch()', function () {
-
-      });
+      store.fetch('beep', 'http://localhost/beep', { merge: false, reload: true })
+        .then((value) => {
+          expect(s.get('beep')).to.have.property('foo', 'foo');
+          setTimeout(() => {
+            s.fetch('bop', 'http://localhost/bop', { merge: false, reload: true })
+              .then((value) => {
+                expect(s.get('beep')).to.have.property('foo', 'foo');
+                expect(s.get('bop')).to.have.property('bar', 'bar');
+                setTimeout(() => {
+                  expect(s.get('beep')).to.have.property('foo', 'foo');
+                  done();
+                }, 600);
+              })
+              .catch((err) => {
+                done(err);
+              });
+          }, 10);
+        })
+        .catch((err) => {
+          done(err);
+        });
     });
   });
 });
