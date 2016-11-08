@@ -66,7 +66,7 @@ module.exports = class DataStore extends Emitter {
       });
     }
 
-    this.bootstrap('', data || {});
+    this.bootstrap(null, data || {});
   }
 
   /**
@@ -107,17 +107,15 @@ module.exports = class DataStore extends Emitter {
   _route (privateMethodName, ...args) {
     let [key, ...rest] = args;
 
-    if (key == null) return this[privateMethodName](key, ...rest);
-
-    if ('string' == typeof key) {
-      if (key.charAt(0) == '/') key = key.slice(1);
+    if (key == null || 'string' == typeof key) {
+      if (key && key.charAt(0) == '/') key = key.slice(1);
 
       // Defer to handlers
       if (this._handlers[privateMethodName] && this._handlers[privateMethodName].length) {
         return this._handlers[privateMethodName]
           .filter(({ namespace }) => {
             // Will match if handler.namespace == ''
-            return key.indexOf(namespace) == 0;
+            return key == null || key.indexOf(namespace) == 0;
           })
           // Execute handlers in sequence
           .reduce((value, { handler, namespace }) => {

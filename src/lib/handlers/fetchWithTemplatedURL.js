@@ -8,11 +8,11 @@ const urlUtils = require('@yr/url-utils');
  * @param {DataStore} store
  * @param {String} key
  * @param {String} urlTemplate
- * @param {Object} memoizedOptions
+ * @param {Object} defaultOptions
  */
-module.exports = function handlerFactory (store, key, urlTemplate, memoizedOptions) {
+module.exports = function handlerFactory (store, key, urlTemplate, defaultOptions) {
   store.registerHandler('fetch', key, function fetchWithTemplatedURLHandler (store, fetch, rootKey, key, url, options) {
-    options = assign({}, memoizedOptions, options);
+    options = assign({}, defaultOptions, options);
     if ('string' != typeof url) url = urlUtils.template(urlTemplate, url);
     return fetch(rootKey, url, options);
   });

@@ -3,7 +3,7 @@
 const agent = require('@yr/agent');
 const expect = require('expect.js');
 const nock = require('nock');
-const Store = require('../src/index');
+const { create: createStore, handlers } = require('../src/index');
 
 const storage = {
   _storage: {},
@@ -37,7 +37,7 @@ let fake, store;
 
 describe('DataStore', function () {
   beforeEach(function () {
-    store = Store.create('store', {
+    store = createStore('store', {
       bar: 'bat',
       boo: 'foo',
       foo: {
@@ -59,7 +59,7 @@ describe('DataStore', function () {
       expect(store._data).to.have.property('bar', 'bat');
     });
     it('should instantiate with id', function () {
-      store = Store.create('foo');
+      store = createStore('foo');
       expect(store.id).to.equal('foo');
     });
   });
@@ -468,14 +468,14 @@ describe('DataStore', function () {
       describe('bootstrap()', function () {
         it('should instantiate with storage data', function () {
           storage.set('/foo/bar', { boo: 'bat' });
-          const s = Store.create('foo', null, { storage: { store: storage } });
+          const s = createStore('foo', null, { storage: { store: storage } });
 
           expect(s._data).to.eql({ foo: { bar: { boo: 'bat' } } });
           expect(storage.get('/foo')).to.eql({ '/foo/bar': { boo: 'bat' } });
         });
         it('should instantiate with storage data and passed data', function () {
           storage.set('/foo/bar', { boo: 'bat' });
-          const s = Store.create('foo', { foo: { bat: 'boo' }, bar: 'bar' }, { storage: { store: storage } });
+          const s = createStore('foo', { foo: { bat: 'boo' }, bar: 'bar' }, { storage: { store: storage } });
 
           expect(s._data).to.eql({ foo: { bar: { boo: 'bat' }, bat: 'boo' }, bar: 'bar' });
           // expect(storage.get('/foo')).to.eql({ '/foo/bar': { boo: 'bat' }, '/foo/bat': 'boo' });
@@ -483,7 +483,7 @@ describe('DataStore', function () {
         it('should instantiate with storage data, upgrading if necessary', function () {
           storage.shouldUpgrade = function (key) { return true; };
           storage.set('/foo/bar', { boo: 'bat' });
-          const s = Store.create('foo', null, { storage: { store: storage } });
+          const s = createStore('foo', null, { storage: { store: storage } });
 
           expect(s._data).to.eql({ });
           expect(storage.get('/foo')).to.eql({ });
@@ -491,7 +491,7 @@ describe('DataStore', function () {
         it('should instantiate with storage data, upgrading via delegate if necessary', function () {
           storage.shouldUpgrade = function (key) { return true; };
           storage.set('/foo/bar', { boo: 'bat' });
-          const s = Store.create('foo', null, {
+          const s = createStore('foo', null, {
             handlers: {
               set: {
                 foo: function (store, set, key, value, options) {
@@ -529,7 +529,7 @@ describe('DataStore', function () {
 
 describe('FetchableDataStore', function () {
   beforeEach(function () {
-    store = Store.create('store', {
+    store = createStore('store', {
       bar: 'bat',
       boo: 'foo',
       foo: {
@@ -741,6 +741,12 @@ describe('FetchableDataStore', function () {
         .catch((err) => {
           done(err);
         });
+    });
+  });
+
+  describe('handlers', function () {
+    describe('fetchWithTemplatedURL', function () {
+
     });
   });
 });
