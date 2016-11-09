@@ -85,16 +85,16 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
-   * Register 'handler' for 'methodName' and 'namespace'
+   * Register 'handler' for 'methodName' and 'match'
    * @param {String} methodName
-   * @param {String} namespace
+   * @param {String|RegExp} match
    * @param {Function} handler
    */
-  registerHandler (methodName, namespace, handler) {
+  registerHandler (methodName, match, handler) {
     const privateMethodName = `_${methodName}`;
 
     if (!this._handlers[privateMethodName]) this._handlers[privateMethodName] = [];
-    this._handlers[privateMethodName].push({ handler, namespace });
+    this._handlers[privateMethodName].push({ handler, match });
   }
 
   /**
@@ -113,19 +113,24 @@ module.exports = class DataStore extends Emitter {
       // Defer to handlers
       if (this._handlers[privateMethodName] && this._handlers[privateMethodName].length) {
         return this._handlers[privateMethodName]
-          .filter(({ namespace }) => {
-            // Will match if handler.namespace == ''
-            return key == null || key.indexOf(namespace) == 0;
+          .filter(({ match }) => {
+            if (key == null) return true;
+            if (match instanceof RegExp) return match.test(key);
+            // Will match if handler.match == ''
+            return key.indexOf(match) == 0;
           })
           // Execute handlers in sequence
-          .reduce((value, { handler, namespace }) => {
-            const namespaceLength = keys.length(namespace);
+          .reduce((value, { handler, match }) => {
+            // Convert to string, striping leading/trailing '/'
+            if (match instanceof RegExp) match = String(match).slice(1, -1);
+            const matchLength = keys.length(match);
 
             // Pass new value to next handler
+            // TODO: only if bootstrap/set/update?
             if (value !== null) rest[0] = value;
 
             // handler(store, method, originalKey, key, ...rest)
-            const handlerValue = handler(this, this[privateMethodName], key, keys.slice(key, namespaceLength), ...rest);
+            const handlerValue = handler(this, this[privateMethodName], key, keys.slice(key, matchLength), ...rest);
 
             return handlerValue !== undefined ? handlerValue : value;
           }, null);

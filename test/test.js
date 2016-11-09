@@ -388,6 +388,18 @@ describe('DataStore', function () {
         expect(store.get('foo/bar')).to.equal('boo');
         expect(run).to.equal(1);
       });
+      it.only('should allow regex matched handling', function () {
+        let run = 0;
+
+        store.registerHandler('get', /foo\/[a-z]ar/, function (store, get, rootKey, key) {
+          run++;
+          expect(key).to.equal('');
+          expect(rootKey).to.equal('foo/bar');
+          return get(rootKey);
+        });
+        expect(store.get('foo/bar')).to.equal('boo');
+        expect(run).to.equal(1);
+      });
       it('should allow delegation for computed values', function () {
         let run = 0;
 
