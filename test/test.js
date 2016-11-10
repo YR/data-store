@@ -369,9 +369,9 @@ describe('DataStore', function () {
       it('should allow handling', function () {
         let run = 0;
 
-        store.registerHandler('get', '', function (store, get, rootKey, key) {
+        store.registerHandler('get', '', function (store, get, key) {
           run++;
-          return get(rootKey);
+          return get(key);
         });
         expect(store.get('bar')).to.equal('bat');
         expect(run).to.equal(1);
@@ -379,11 +379,10 @@ describe('DataStore', function () {
       it('should allow namespaced handling', function () {
         let run = 0;
 
-        store.registerHandler('get', 'foo', function (store, get, rootKey, key) {
+        store.registerHandler('get', 'foo', function (store, get, key) {
           run++;
-          expect(key).to.equal('bar');
-          expect(rootKey).to.equal('foo/bar');
-          return get(rootKey);
+          expect(key).to.equal('foo/bar');
+          return get(key);
         });
         expect(store.get('foo/bar')).to.equal('boo');
         expect(run).to.equal(1);
@@ -391,11 +390,10 @@ describe('DataStore', function () {
       it('should allow regex matched handling', function () {
         let run = 0;
 
-        store.registerHandler('get', /foo\/[a-z]ar/, function (store, get, rootKey, key) {
+        store.registerHandler('get', /foo\/[a-z]ar/, function (store, get, key) {
           run++;
-          expect(key).to.equal('');
-          expect(rootKey).to.equal('foo/bar');
-          return get(rootKey);
+          expect(key).to.equal('foo/bar');
+          return get(key);
         });
         expect(store.get('foo/bar')).to.equal('boo');
         expect(run).to.equal(1);
@@ -403,7 +401,7 @@ describe('DataStore', function () {
       it('should allow delegation for computed values', function () {
         let run = 0;
 
-        store.registerHandler('get', '', function (store, get, rootKey, key) {
+        store.registerHandler('get', '', function (store, get, key) {
           run++;
           return `${get('bar')} ${get('boo')}`;
         });
@@ -413,11 +411,11 @@ describe('DataStore', function () {
       it('should allow multiple delegates', function () {
         let run = 0;
 
-        store.registerHandler('get', 'foo', function (store, get, rootKey, key) {
+        store.registerHandler('get', 'foo', function (store, get, key) {
           run++;
-          return get(rootKey);
+          return get(key);
         });
-        store.registerHandler('get', 'foo', function (store, get, rootKey, key, value) {
+        store.registerHandler('get', 'foo', function (store, get, key, value) {
           run++;
           expect(value).to.equal('boo');
         });
@@ -431,11 +429,10 @@ describe('DataStore', function () {
       it('should allow delegation', function () {
         let run = 0;
 
-        store.registerHandler('set', 'zing', function (store, set, rootKey, key, value, options) {
+        store.registerHandler('set', 'zing', function (store, set, key, value, options) {
           run++;
-          expect(key).to.equal('');
-          expect(rootKey).to.equal('zing');
-          return set(rootKey, 'bar');
+          expect(key).to.equal('zing');
+          return set(key, 'bar');
         });
         store.set('zing', 'foo');
         expect(store._data.zing).to.equal('bar');
@@ -444,11 +441,11 @@ describe('DataStore', function () {
       it('should allow multiple delegates', function () {
         let run = 0;
 
-        store.registerHandler('set', 'zing', function (store, set, rootKey, key, value, options) {
+        store.registerHandler('set', 'zing', function (store, set, key, value, options) {
           run++;
-          return set(rootKey, 'bar');
+          return set(key, 'bar');
         });
-        store.registerHandler('set', 'zing', function (store, set, rootKey, key, value, options) {
+        store.registerHandler('set', 'zing', function (store, set, key, value, options) {
           run++;
           set('zang', value);
         });
