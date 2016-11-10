@@ -121,19 +121,14 @@ module.exports = class DataStore extends Emitter {
       // Defer to handlers
       if (this._handlers[privateMethodName] && this._handlers[privateMethodName].length) {
         return this._handlers[privateMethodName]
-          .filter(({ match }) => {
-            if (match instanceof RegExp) return match.test(key);
-            if (key == null && !match) return true;
-            // Will match if handler.match == ''
-            return key.indexOf(match) == 0;
-          })
+          .filter(({ match }) => this.isMatchKey(key, match))
           // Execute handlers in sequence
           .reduce((value, { handler, match }) => {
             // Pass new value to next handler
             // TODO: only if bootstrap/set/update?
             if (value !== null) rest[0] = value;
 
-            // handler(store, method, originalKey, key, ...rest)
+            // handler(store, method, key, ...rest)
             const handlerValue = handler(this, this[privateMethodName], key, ...rest);
 
             return handlerValue !== undefined ? handlerValue : value;
@@ -303,6 +298,19 @@ module.exports = class DataStore extends Emitter {
    */
   isRootKey (key) {
     return key ? (key.charAt(0) == '/') : false;
+  }
+
+  /**
+   * Determine if 'key' matches 'match'
+   * @param {String} key
+   * @param {String|RegExp} match
+   * @returns {Boolean}
+   */
+  isMatchKey (key, match) {
+    if (match instanceof RegExp) return match.test(key);
+    if (key == null && !match) return true;
+    // Will match if match == ''
+    return key.indexOf(match) == 0;
   }
 
   /**
