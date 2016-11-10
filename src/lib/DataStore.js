@@ -60,11 +60,7 @@ module.exports = class DataStore extends Emitter {
     DEFAULT_HANDLED_METHODS.forEach((methodName) => {
       this.registerHandledMethod(methodName);
     });
-    if (options.handlers) {
-      options.handlers.forEach(({ method, namespace, handler }) => {
-        this.registerHandler(method, namespace, handler);
-      });
-    }
+    if (options.handlers) this.registerHandlers(options.handlers);
 
     this.bootstrap(null, data || {});
   }
@@ -95,6 +91,18 @@ module.exports = class DataStore extends Emitter {
 
     if (!this._handlers[privateMethodName]) this._handlers[privateMethodName] = [];
     this._handlers[privateMethodName].push({ handler, match });
+  }
+
+  /**
+   * Bulk register 'handlers'
+   * @param {Object} handlers
+   */
+  registerHandlers (handlers) {
+    for (const methodName in handlers) {
+      handlers[methodName].forEach(({ handler, match }) => {
+        this.registerHandler(methodName, match, handler);
+      });
+    }
   }
 
   /**

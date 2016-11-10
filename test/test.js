@@ -388,7 +388,7 @@ describe('DataStore', function () {
         expect(store.get('foo/bar')).to.equal('boo');
         expect(run).to.equal(1);
       });
-      it.only('should allow regex matched handling', function () {
+      it('should allow regex matched handling', function () {
         let run = 0;
 
         store.registerHandler('get', /foo\/[a-z]ar/, function (store, get, rootKey, key) {
@@ -523,7 +523,7 @@ describe('DataStore', function () {
           expect(s._data).to.eql({ foo: 'boo' });
           expect(storage.get('/foo')).to.eql({ '/foo': 'boo' });
         });
-      })
+      });
 
       describe('set()', function () {
         it('should persist data to storage with "options.persistent"', function () {
@@ -661,7 +661,6 @@ describe('FetchableDataStore', function () {
       fake
         .get('/beep')
         .reply(500);
-
       return store
         .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
         .then((value) => {
@@ -674,7 +673,6 @@ describe('FetchableDataStore', function () {
         .get('/beep')
         .delayConnection(100)
         .reply(200, { beep: 'beep' });
-
       store.fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
         .then((value) => {
           expect(value.data).to.equal(null);
@@ -691,7 +689,6 @@ describe('FetchableDataStore', function () {
         .reply(200, { beep: 'foo' }, { expires: 0 })
         .get('/beep')
         .reply(200, { beep: 'bar' });
-
       store.fetch('beep', 'http://localhost/beep', { reload: true, retry: 0, timeout: 10, minExpiry: 75 })
         .then((value) => {
           expect(store.get('beep')).to.have.property('beep', 'foo');
@@ -710,7 +707,6 @@ describe('FetchableDataStore', function () {
         .reply(500)
         .get('/beep')
         .reply(200, { beep: 'bar' });
-
       store.fetch('beep', 'http://localhost/beep', { reload: true, retry: 0, timeout: 10, minExpiry: 75 })
         .then((value) => {
           expect(value.data).to.equal(null);
@@ -757,8 +753,38 @@ describe('FetchableDataStore', function () {
   });
 
   describe('handlers', function () {
-    describe('fetchWithTemplatedURL', function () {
+    beforeEach(function () {
+      fake = nock('http://localhost');
+    });
+    afterEach(function () {
+      nock.cleanAll();
+    });
 
+    describe('fetchWithTemplatedURL', function () {
+      it('should handle fetching with url template values', function () {
+        fake
+          .get('/foo')
+          .reply(200, { foo: 'foo' });
+        store.set('foo/__expires', 0);
+        store.registerHandlers(handlers.fetchWithTemplatedURL('foo', 'http://localhost/{page}', {}, store));
+        return store
+          .fetch('foo', { page: 'foo' })
+          .then((value) => {
+            expect(value.data).to.have.property('foo', 'foo');
+          });
+      });
+      it('should handle fetching with default options', function () {
+        fake
+          .get('/foo')
+          .reply(200, { foo: 'foo' });
+        store.set('foo/__expires', 0);
+        store.registerHandlers(handlers.fetchWithTemplatedURL('foo', 'http://localhost/{page}', { staleWhileRevalidate: true }, store));
+        return store
+          .fetch('foo', { page: 'foo' })
+          .then((value) => {
+            expect(value.data).to.have.property('bar', 'boo');
+          });
+      });
     });
   });
 });
