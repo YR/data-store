@@ -14,10 +14,9 @@ module.exports = function handlerFactory (match, urlTemplate, defaultOptions) {
   return {
     fetch: [{
       match,
-      handler: function fetchWithTemplatedURLHandler (store, fetch, key, url, options) {
-        options = assign({}, defaultOptions, options);
-        if ('string' != typeof url) url = urlUtils.template(urlTemplate, url);
-        return fetch(key, url, options);
+      handler: function fetchWithTemplatedURLHandler (store, context) {
+        context.options = assign({}, defaultOptions, context.options);
+        if ('string' != typeof context.url) context.url = urlUtils.template(urlTemplate, context.url);
       }
     }]
   };

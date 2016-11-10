@@ -27,7 +27,7 @@ module.exports = class FetchableDataStore extends DataStore {
   constructor (id, data, options = {}) {
     super(id, data, options);
 
-    this.registerHandledMethod('fetch');
+    this.registerHandledMethod('fetch', this._fetch, ['key', 'url', 'options']);
   }
 
   /**
