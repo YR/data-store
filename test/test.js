@@ -168,28 +168,6 @@ describe('DataStore', function () {
       });
     });
 
-    describe('remove()', function () {
-      it('should remove a key', function (done) {
-        store.on('remove:bar', (value, oldValue) => {
-          expect(value).to.equal(null);
-          expect(oldValue).to.equal('bat');
-          expect(store.get('bar')).to.eql(undefined);
-          done();
-        });
-        store.remove('bar');
-      });
-      it('should not remove a key that doesn\'t exist', function (done) {
-        store.on('remove', (value, oldValue) => {
-          throw new Error('nope');
-        });
-        setTimeout(() => {
-          expect(store.get('zing')).to.eql(undefined);
-          done();
-        }, 40);
-        store.remove('zing');
-      });
-    });
-
     describe('update()', function () {
       it('should set a value for "key"', function () {
         store.update('bar', 'bar');

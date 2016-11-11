@@ -1,6 +1,5 @@
 'use strict';
 
-const clock = require('@yr/clock');
 const get = require('./get');
 const keys = require('@yr/keys');
 const set = require('./set');
@@ -18,15 +17,7 @@ module.exports = function remove (store, key) {
 
   // Only remove existing (prevent recursive trap)
   if (data && k in data) {
-    const oldValue = data[k];
-
     store.debug('remove "%s"', key);
     set(store, k, undefined);
-
-    // Delay to prevent race condition
-    clock.immediate(() => {
-      store.emit(`remove:${key}`, null, oldValue);
-      store.emit('remove', key, null, oldValue);
-    });
   }
 };
