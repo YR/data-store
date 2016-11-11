@@ -41,8 +41,10 @@ module.exports = class DataStoreCursor {
    * @param {String} key
    * @param {Object} value
    * @param {Object} [options]
+   *  - {Boolean} reference
+   *  - {Boolean} merge
    */
-  update (key, value, options) {
+  update (key, value, options, ...args) {
     // Handle empty key (set value at cursor root)
     if (!key) key = this.key;
 
@@ -58,7 +60,7 @@ module.exports = class DataStoreCursor {
     }
 
     // Batch update
-    this.dataStore.update(key, null, options);
+    this.dataStore.update(key, null, options, ...args);
   }
 
   /**
@@ -76,4 +78,4 @@ module.exports = class DataStoreCursor {
   destroy () {
     this.dataStore = null;
   }
-}
+};
