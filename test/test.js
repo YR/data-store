@@ -9,37 +9,10 @@ const load = require('../src/lib/methods/load');
 const nock = require('nock');
 const reload = require('../src/lib/methods/reload');
 const set = require('../src/lib/methods/set');
+const storage = require('@yr/local-storage');
 const remove = require('../src/lib/methods/remove');
 const update = require('../src/lib/methods/update');
 
-const storage = {
-  _storage: {},
-  init () {
-    this._storage = {};
-  },
-  get (key) {
-    return Object.keys(this._storage)
-      .filter((k) => {
-        return (k.indexOf(key) == 0);
-      })
-      .reduce((data, k) => {
-        data[k] = this._storage[k];
-        return data;
-      }, {});
-  },
-  set (key, value) {
-    this._storage[key] = value;
-  },
-  remove (key) {
-    delete this._storage[key];
-  },
-  clear () {
-    this._storage = {};
-  },
-  shouldUpgrade (key) {
-    return false;
-  }
-};
 let fake, store;
 
 describe('DataStore', function () {
@@ -511,83 +484,52 @@ describe('DataStore', function () {
           expect(run).to.equal(2);
         });
       });
+    });
+  });
 
-      describe.skip('persistance', function () {
-        before(function () {
-          storage.clear();
-          storage.init();
-        });
-        afterEach(function () {
-          storage.clear();
-        });
+  describe('handlers', function () {
+    describe('persistToStorage', function () {
+      before(function () {
+        storage.clear();
+        storage.init({ version: { foo: 1 }, writeDelay: 0 });
+      });
+      beforeEach(function () {
+        store.destroy();
+      });
+      afterEach(function () {
+        storage.clear();
+      });
 
-        describe('getStorageKeys()', function () {
-          it('should return all keys if passed an empty key', function () {
-            expect(store.getStorageKeys()).to.eql(['/bar', '/boo', '/foo/bar', '/foo/boo', '/bat']);
-          });
-          it('should return keys of a fixed length', function () {
-            expect(store.getStorageKeys('foo/boo/bar')).to.eql(['/foo/boo']);
-          });
-        });
-
-        describe('bootstrap()', function () {
-          it('should instantiate with storage data', function () {
-            storage.set('/foo/bar', { boo: 'bat' });
-            const s = createStore('foo', null, { storage: { store: storage } });
-
-            expect(s._data).to.eql({ foo: { bar: { boo: 'bat' } } });
-            expect(storage.get('/foo')).to.eql({ '/foo/bar': { boo: 'bat' } });
-          });
-          it('should instantiate with storage data and passed data', function () {
-            storage.set('/foo/bar', { boo: 'bat' });
-            const s = createStore('foo', { foo: { bat: 'boo' }, bar: 'bar' }, { storage: { store: storage } });
-
-            expect(s._data).to.eql({ foo: { bar: { boo: 'bat' }, bat: 'boo' }, bar: 'bar' });
-            // expect(storage.get('/foo')).to.eql({ '/foo/bar': { boo: 'bat' }, '/foo/bat': 'boo' });
-          });
-          it('should instantiate with storage data, upgrading if necessary', function () {
-            storage.shouldUpgrade = function (key) { return true; };
-            storage.set('/foo/bar', { boo: 'bat' });
-            const s = createStore('foo', null, { storage: { store: storage } });
-
-            expect(s._data).to.eql({ });
-            expect(storage.get('/foo')).to.eql({ });
-          });
-          it('should instantiate with storage data, upgrading via delegate if necessary', function () {
-            storage.shouldUpgrade = function (key) { return true; };
-            storage.set('/foo/bar', { boo: 'bat' });
-            const s = createStore('foo', null, {
-              handlers: {
-                set: {
-                  foo: function (store, set, key, value, options) {
-                    options.persistent = true;
-                    set(key, value, options);
-                  }
-                },
-                upgradeStorageData: {
-                  foo: function (store, upgradeStorageData, key, value) {
-                    return 'boo';
-                  }
-                }
-              },
-              storage: { store: storage }
-            });
-
-            expect(s._data).to.eql({ foo: 'boo' });
-            expect(storage.get('/foo')).to.eql({ '/foo': 'boo' });
-          });
-        });
-
-        describe('set()', function () {
-          it('should persist data to storage with "options.persistent"', function () {
-            store.set('bar', { boo: 'foo' }, { persistent: true });
-            expect(storage.get('/bar')).to.eql({ '/bar/boo': 'foo' });
-          });
-          it('should persist deeply nested data to storage', function () {
-            store.set('foo/bing/bong/boop', 'boop', { persistent: true });
-            expect(storage.get('/foo/bing')).to.have.property('/foo/bing').eql({ bong: { boop: 'boop' } });
-          });
-        });
+      it('should instantiate store with storage data', function () {
+        storage.set('foo/bar', { boo: 'bat' });
+        store = createStore('store', null, { handlers: handlers.persistToStorage(/foo/, storage, 2) });
+        expect(store._data).to.eql({ foo: { bar: { boo: 'bat' } } });
+        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'bat' } });
+      });
+      it('should instantiate with storage data and passed data', function () {
+        storage.set('foo/bar', { boo: 'bat' });
+        store = createStore('store', { foo: { bat: 'boo' }, bar: 'bar' }, { handlers: handlers.persistToStorage(/foo/, storage, 2) });
+        expect(store._data).to.eql({ foo: { bar: { boo: 'bat' }, bat: 'boo' }, bar: 'bar' });
+        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'bat' } });
+      });
+      it('should instantiate with storage data, upgrading if necessary', function () {
+        storage.set('foo/bar', { boo: 'bat' });
+        storage.init({ version: { foo: 2 }, writeDelay: 0 });
+        store = createStore('store', null, { handlers: handlers.persistToStorage(/foo/, storage, 2, (key, value) => 'foo') });
+        expect(store._data).to.eql({ foo: { bar: 'foo' } });
+        expect(storage.get('foo')).to.eql({ 'foo/bar': 'foo' });
+      });
+      it('should persist data to storage when set', function () {
+        store = createStore('store', { foo: { bat: 'boo' }, bar: 'bar' }, { handlers: handlers.persistToStorage(/foo\/bar/, storage, 2) });
+        store.set('foo/bar', { boo: 'foo' });
+        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'foo' } });
+      });
+      it('should unpersist data to storage when removed', function () {
+        store = createStore('store', { foo: { bat: 'boo' }, bar: 'bar' }, { handlers: handlers.persistToStorage(/foo\/bar/, storage, 2) });
+        store.set('foo/bar', { boo: 'foo' });
+        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'foo' } });
+        store.remove('foo/bar');
+        expect(storage.get('foo')).to.eql({ });
       });
     });
   });
@@ -811,14 +753,14 @@ describe('FetchableDataStore', function () {
   });
 
   describe('handlers', function () {
-    beforeEach(function () {
-      fake = nock('http://localhost');
-    });
-    afterEach(function () {
-      nock.cleanAll();
-    });
-
     describe('fetchWithTemplatedURL', function () {
+      beforeEach(function () {
+        fake = nock('http://localhost');
+      });
+      afterEach(function () {
+        nock.cleanAll();
+      });
+
       it('should handle fetching with url template values', function () {
         fake
           .get('/foo')

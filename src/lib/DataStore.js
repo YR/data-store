@@ -123,8 +123,11 @@ module.exports = class DataStore extends Emitter {
         // Abort on first return value
         if (returnValue !== undefined) return returnValue;
         if (i == n - 1) {
-          // Handlers can potentially re-batch keys, so unbatch
-          return unbatchKeyedFunctionCall(fn, ...applyHandlerContext(signature, context));
+          args = applyHandlerContext(signature, context);
+          return isKeyed
+            // Handlers can potentially re-batch keys, so unbatch
+            ? unbatchKeyedFunctionCall(fn, ...args)
+            : fn(...args);
         }
       }
     }

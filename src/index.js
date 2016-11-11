@@ -10,6 +10,7 @@
 const DataStore = require('./lib/DataStore');
 const FetchableDataStore = require('./lib/FetchableDataStore');
 const fetchWithTemplatedURL = require('./lib/handlers/fetchWithTemplatedURL');
+const persistToStorage = require('./lib/handlers/persistToStorage');
 
 module.exports = {
   /**
@@ -31,6 +32,7 @@ module.exports = {
   },
 
   handlers: {
-    fetchWithTemplatedURL
+    fetchWithTemplatedURL,
+    persistToStorage
   }
 };
