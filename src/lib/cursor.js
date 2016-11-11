@@ -68,7 +68,7 @@ class DataStoreCursor {
     }
 
     // Batch update
-    this.dataStore.update(key, options);
+    this.dataStore.update(key, null, options);
   }
 
   /**

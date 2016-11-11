@@ -7,32 +7,22 @@
 
 'use strict';
 
-const assign = require('object-assign');
-const clock = require('@yr/clock');
 const Cursor = require('./cursor');
 const Debug = require('debug');
 const Emitter = require('eventemitter3');
+const get = require('./methods/get');
 const isPlainObject = require('is-plain-obj');
-const keys = require('@yr/keys');
-const property = require('@yr/property');
-const runtime = require('@yr/runtime');
+const set = require('./methods/set');
+const unset = require('./methods/unset');
+const update = require('./methods/update');
 
-const DEFAULT_SET_OPTIONS = {
-  // Browser immutable by default
-  immutable: runtime.isBrowser,
-  serialisable: true,
-  merge: true
-};
-const DEFAULT_HANDLED_METHODS = {
-  // method:signature
-  // In theory, this is possible to do dynamically with function.toString()
-  // However, lot's of edge cases with es6 syntax, so do it manually
-  destroy: [],
-  get: ['key'],
-  reset: ['data'],
-  set: ['key', 'value', 'options'],
-  unset: ['key'],
-  update: ['key', 'value', 'options', '...args']
+const HANDLED_METHODS = {
+  destroy: [destroy, []],
+  get: [get, ['key']],
+  reset: [reset, ['data']],
+  set: [set, ['key', 'value', 'options']],
+  unset: [unset, ['key']],
+  update: [update, ['key', 'value', 'options', '...args']]
 };
 const REFERENCE_KEY = '__ref';
 
@@ -51,6 +41,8 @@ module.exports = class DataStore extends Emitter {
   constructor (id, data, options = {}) {
     super();
 
+    this.REFERENCE_KEY = REFERENCE_KEY;
+
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
@@ -58,109 +50,86 @@ module.exports = class DataStore extends Emitter {
 
     this._cursors = {};
     this._data = {};
-    this._handlers = {};
     this._handledMethods = {};
+    this._handlers = {};
     this._serialisableKeys = options.serialisableKeys || {};
-    this._route = this._route.bind(this);
 
-    for (const methodName in DEFAULT_HANDLED_METHODS) {
-      this.registerHandledMethod(methodName, this[`_${methodName}`], DEFAULT_HANDLED_METHODS[methodName]);
+    for (const methodName in HANDLED_METHODS) {
+      this.registerHandledMethod(methodName, ...HANDLED_METHODS[methodName]);
     }
-    if (options.handlers) this.registerHandlers(options.handlers);
+    if (options.handlers) this.registerMethodHandlers(options.handlers);
 
     this.reset(data || {});
   }
 
   /**
-   * Register 'fn' as 'methodName'
+   * Register handled method with 'methodName'
    * @param {String} methodName
    * @param {Function} fn
-   * @param {Array} [signature]
+   * @param {Array} signature
    */
-  registerHandledMethod (methodName, fn, signature = []) {
-    if (this[methodName] || !fn) return;
+  registerHandledMethod (methodName, fn, signature) {
+    if (this._handledMethods[methodName]) return;
 
-    const privateMethodName = `_${methodName}`;
-
-    this._handledMethods[privateMethodName] = signature;
-    this[methodName] = this._route.bind(this, privateMethodName);
-    this[privateMethodName] = fn.bind(this);
-  }
-
-  /**
-   * Register 'handler' for 'methodName' and 'match'
-   * @param {String} methodName
-   * @param {String|RegExp} match
-   * @param {Function} handler
-   */
-  registerHandler (methodName, match, handler) {
-    const privateMethodName = `_${methodName}`;
-
-    if (!this._handlers[privateMethodName]) this._handlers[privateMethodName] = [];
-    this._handlers[privateMethodName].push({ handler, match });
+    if (!this._handlers[methodName]) this._handlers[methodName] = [];
+    // Partially apply arguments for routing
+    this._handledMethods[methodName] = this._routeHandledMethod.bind(this, fn.bind(this, this), signature, this._handlers[methodName]);
   }
 
   /**
    * Bulk register 'handlers'
    * @param {Object} handlers
    */
-  registerHandlers (handlers) {
+  registerMethodHandlers (handlers) {
     for (const methodName in handlers) {
       handlers[methodName].forEach(({ handler, match }) => {
-        this.registerHandler(methodName, match, handler);
+        this.registerMethodHandler(methodName, match, handler);
       });
     }
   }
 
   /**
-   * Route 'privateMethodName' to appropriate handler, depending on passed 'key' (args[0])
-   * @param {String} privateMethodName
+   * Register 'handler' for 'methodName' with 'match'
+   * @param {String} methodName
+   * @param {String|RegExp} match
+   * @param {Function} handler
+   */
+  registerMethodHandler (methodName, match, handler) {
+    this._handlers[methodName].push({ handler, match });
+  }
+
+  /**
+   * Route 'fn' through 'handlers'
+   * @param {Function} fn
+   * @param {Array} signature
+   * @param {Object} handlers
    * @param {*} args
    * @returns {Object|null}
    */
-  _route (privateMethodName, ...args) {
-    const signature = this._handledMethods[privateMethodName];
-    const isKeyedMethod = (signature[0] == 'key');
+  _routeHandledMethod (fn, signature, handlers, ...args) {
+    const isKeyed = signature[0] == 'key';
     let [key, ...rest] = args;
 
-    if (!isKeyedMethod || !key || 'string' == typeof key) {
-      if (isKeyedMethod && key && key.charAt(0) == '/') key = key.slice(1);
+    if (isKeyed && key && key.charAt(0) == '/') key = key.slice(1);
 
-      // Defer to handlers
-      if (this._handlers[privateMethodName] && this._handlers[privateMethodName].length) {
-        const handlers = this._handlers[privateMethodName].filter(({ match }) => this.isMatchKey(key, match));
-        let context = getHandlerContext(signature, args);
+    // Defer to handlers
+    if (handlers && handlers.length) {
+      const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this.isMatchKey(key, match));
+      let context = getHandlerContext(signature, args);
 
-        for (let i = 0, n = handlers.length; i < n; i++) {
-          const returnValue = handlers[i].handler(this, context);
+      for (let i = 0, n = matchingHandlers.length; i < n; i++) {
+        const returnValue = matchingHandlers[i].handler(this, context);
 
-          // Abort on first return value
-          if (returnValue !== undefined) return returnValue;
-          if (i == n - 1) {
-            return handleBatchedCall(this[privateMethodName], isKeyedMethod, ...applyHandlerContext(signature, context));
-          }
+        // Abort on first return value
+        if (returnValue !== undefined) return returnValue;
+        if (i == n - 1) {
+          // Handlers can potentially re-batch keys, so unbatch
+          return unbatchKeyedFunctionCall(fn, ...applyHandlerContext(signature, context));
         }
       }
-
-      return this[privateMethodName](key, ...rest);
     }
 
-    handleBatchedCall(this._route, isKeyedMethod, args);
-
-    // Object of key:value
-    if (isPlainObject(key)) {
-      for (const k in key) {
-        this._route(privateMethodName, k, key[k], ...rest);
-      }
-      return;
-    }
-
-    // Array of keys
-    if (Array.isArray(key)) {
-      return key.map((k) => {
-        return this._route(privateMethodName, k, ...rest);
-      });
-    }
+    return fn(key, ...rest);
   }
 
   /**
@@ -168,14 +137,13 @@ module.exports = class DataStore extends Emitter {
    * @param {String} [key]
    * @returns {Object}
    */
-  _get (key) {
-    // Return all if no key specified
-    if (!key) return this._data;
-    return property.get(this._data, key);
+  get (key) {
+    return unbatchKeyedFunctionCall(this._handledMethods.get, key);
   }
 
   /**
    * Store prop 'key' with 'value'
+   * Returns stored value
    * @param {String} key
    * @param {*} value
    * @param {Object} [options]
@@ -184,29 +152,9 @@ module.exports = class DataStore extends Emitter {
    *  - {Boolean} merge
    * @returns {*}
    */
-  _set (key, value, options) {
-    console.log(key, value, options)
+  set (key, value, options) {
     if (!this.isWritable || !key) return;
-
-    options = assign({}, DEFAULT_SET_OPTIONS, options);
-
-    // Write reference key
-    if (options.reference && isPlainObject(value)) value[REFERENCE_KEY] = this.getRootKey(key);
-
-    if (options.immutable) {
-      // Returns same if no change
-      const newData = property.set(this._data, key, value, options);
-
-      if (newData !== this._data) {
-        this._data = newData;
-      } else {
-        this.debug('WARNING no change after set "%s', key);
-      }
-    } else {
-      property.set(this._data, key, value, options);
-    }
-
-    return value;
+    return unbatchKeyedFunctionCall(this._handledMethods.set, key, value, options);
   }
 
   /**
@@ -218,78 +166,32 @@ module.exports = class DataStore extends Emitter {
    *  - {Boolean} reference
    *  - {Boolean} merge
    */
-  _update (key, value, options, ...args) {
-    options = options || {};
-
-    if (this.isWritable) {
-      // Resolve reference keys (use reference key to write to original object)
-      const parent = this.get(keys.slice(key, 0, -1));
-
-      if (parent && parent[REFERENCE_KEY]) key = keys.join(parent[REFERENCE_KEY], keys.last(key));
-
-      this.debug('update %s', key);
-      const oldValue = this.get(key);
-      // TODO: bail if no oldValue?
-
-      options.immutable = true;
-      this.set(key, value, options);
-
-      // Delay to prevent race condition
-      clock.immediate(() => {
-        this.emit(`update:${key}`, value, oldValue, options, ...args);
-        this.emit('update', key, value, oldValue, options, ...args);
-      });
-    }
+  update (key, value, options, ...args) {
+    if (!this.isWritable || !key) return;
+    unbatchKeyedFunctionCall(this._handledMethods.update, key, value, options, ...args);
   }
 
   /**
    * Remove 'key'
    * @param {String} key
    */
-  _unset (key) {
-    // Remove prop from parent
-    const length = keys.length(key);
-    const k = (length == 1) ? key : keys.last(key);
-    const data = (length == 1) ? this._data : this._get(keys.slice(key, 0, -1));
-
-    // Only remove existing (prevent recursive trap)
-    if (data && k in data) {
-      const oldValue = data[k];
-
-      this.debug('unset "%s"', key);
-      delete data[k];
-
-      // Delay to prevent race condition
-      clock.immediate(() => {
-        this.emit(`unset:${key}`, null, oldValue);
-        this.emit('unset', key, null, oldValue);
-      });
-    }
+  unset (key) {
+    unbatchKeyedFunctionCall(this._handledMethods.unset, key);
   }
 
   /**
    * Reset underlying 'data'
    * @param {Object} data
    */
-  _reset (data) {
-    this.debug('reset');
-    this._data = data;
+  reset (data) {
+    this._handledMethods.reset(data);
   }
 
   /**
    * Destroy instance
    */
-  _destroy () {
-    // Destroy cursors
-    for (const key in this._cursors) {
-      this._cursors[key].destroy();
-    }
-    this.destroyed = true;
-    this._cursors = {};
-    this._data = {};
-    this._handlers = {};
-    this._serialisableKeys = {};
-    this.removeAllListeners();
+  destroy () {
+    this._handledMethods.destroy();
   }
 
   /**
@@ -391,45 +293,29 @@ module.exports = class DataStore extends Emitter {
    * @returns {Object}
    */
   toJSON (key) {
-    if (key) return serialise(key, this._get(key), this._serialisableKeys);
+    if (key) return serialise(key, get(this, key), this._serialisableKeys);
     return serialise(null, this._data, this._serialisableKeys);
   }
 };
 
 /**
- * Retrieve serialisable 'data'
- * @param {String} key
- * @param {Object} data
- * @param {Object} config
- * @returns {Object}
+ * Unbatch potentially batched 'key'
+ * @param {Function} fn
+ * @param {String|Array|Object} [key]
+ * @param {*} [args]
+ * @returns {*}
  */
-function serialise (key, data, config) {
-  if (isPlainObject(data)) {
-    let obj = {};
-    let keyChain;
-
-    for (const prop in data) {
-      keyChain = key
-        ? `${key}/${prop}`
-        : prop;
-
-      if (config[keyChain] !== false) {
-        if (isPlainObject(data[prop])) {
-          obj[prop] = serialise(keyChain, data[prop], config);
-        } else if ('object' == typeof data[prop] && 'toJSON' in data[prop]) {
-          obj[prop] = data[prop].toJSON();
-        } else {
-          obj[prop] = data[prop];
-        }
-      }
+function unbatchKeyedFunctionCall (fn, key, ...args) {
+  if (!key || 'string' == typeof key) return fn(key, ...args);
+  // Array of keys
+  if (Array.isArray(key)) return key.map((k) => fn(k, ...args));
+  // Object of key:value
+  if (isPlainObject(key)) {
+    for (const k in key) {
+      fn(k, key[k], ...args);
     }
-
-    return obj;
+    return;
   }
-
-  return (config[key] !== false)
-    ? data
-    : null;
 }
 
 /**
@@ -476,4 +362,67 @@ function applyHandlerContext (signature, context) {
   }
 
   return args;
+}
+
+/**
+ * Reset underlying 'data'
+ * @param {DataStore} store
+ * @param {Object} data
+ */
+function reset (store, data) {
+  store.debug('reset');
+  store._data = data;
+}
+
+/**
+ * Destroy instance
+ * @param {DataStore} store
+ */
+function destroy (store) {
+  // Destroy cursors
+  for (const key in store._cursors) {
+    store._cursors[key].destroy();
+  }
+  store.destroyed = true;
+  store._cursors = {};
+  store._data = {};
+  store._handlers = {};
+  store._serialisableKeys = {};
+  store.removeAllListeners();
+}
+
+/**
+ * Retrieve serialisable 'data'
+ * @param {String} key
+ * @param {Object} data
+ * @param {Object} config
+ * @returns {Object}
+ */
+function serialise (key, data, config) {
+  if (isPlainObject(data)) {
+    let obj = {};
+    let keyChain;
+
+    for (const prop in data) {
+      keyChain = key
+        ? `${key}/${prop}`
+        : prop;
+
+      if (config[keyChain] !== false) {
+        if (isPlainObject(data[prop])) {
+          obj[prop] = serialise(keyChain, data[prop], config);
+        } else if ('object' == typeof data[prop] && 'toJSON' in data[prop]) {
+          obj[prop] = data[prop].toJSON();
+        } else {
+          obj[prop] = data[prop];
+        }
+      }
+    }
+
+    return obj;
+  }
+
+  return (config[key] !== false)
+    ? data
+    : null;
 }
