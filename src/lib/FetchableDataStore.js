@@ -45,6 +45,7 @@ module.exports = class FetchableDataStore extends DataStore {
    * @returns {Promise}
    */
   fetch (key, url, options = {}) {
+    // TODO: accept array of keys
     options = assign({}, DEFAULT_LOAD_OPTIONS, options);
     return this._handledMethods.fetch(key, url, options);
   }

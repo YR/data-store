@@ -27,6 +27,7 @@ const DEFAULT_OPTIONS = {
 module.exports = function set (store, key, value, options) {
   options = assign({}, DEFAULT_OPTIONS, options);
 
+  // TODO: check if value already has reference and track
   // Write reference key
   if (options.reference && isPlainObject(value)) value[store.REFERENCE_KEY] = store.getRootKey(key);
 

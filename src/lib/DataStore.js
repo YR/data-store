@@ -100,43 +100,6 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
-   * Route 'fn' through 'handlers'
-   * @param {Function} fn
-   * @param {Array} signature
-   * @param {Object} handlers
-   * @param {*} args
-   * @returns {Object|null}
-   */
-  _routeHandledMethod (fn, signature, handlers, ...args) {
-    const isKeyed = signature[0] == 'key';
-    let [key, ...rest] = args;
-
-    if (isKeyed && key && key.charAt(0) == '/') key = key.slice(1);
-
-    // Defer to handlers
-    if (handlers && handlers.length) {
-      const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this.isMatchKey(key, match));
-      let context = getHandlerContext(signature, args);
-
-      for (let i = 0, n = matchingHandlers.length; i < n; i++) {
-        const returnValue = matchingHandlers[i].handler(this, context);
-
-        // Abort on first return value
-        if (returnValue !== undefined) return returnValue;
-        if (i == n - 1) {
-          args = applyHandlerContext(signature, context);
-          return isKeyed
-            // Handlers can potentially re-batch keys, so unbatch
-            ? unbatchKeyedFunctionCall(fn, ...args)
-            : fn(...args);
-        }
-      }
-    }
-
-    return fn(key, ...rest);
-  }
-
-  /**
    * Retrieve property value with `key`
    * @param {String} [key]
    * @returns {Object}
@@ -154,11 +117,10 @@ module.exports = class DataStore extends Emitter {
    *  - {Boolean} immutable
    *  - {Boolean} reference
    *  - {Boolean} merge
-   * @returns {*}
    */
   set (key, value, options) {
     if (!this.isWritable || !key) return;
-    return unbatchKeyedFunctionCall(this._handledMethods.set, key, value, options);
+    unbatchKeyedFunctionCall(this._handledMethods.set, key, value, options);
   }
 
   /**
@@ -166,7 +128,7 @@ module.exports = class DataStore extends Emitter {
    * Allows passing of arbitrary additional args to listeners
    * @param {String} key
    * @param {Object} value
-   * @param {Object} options
+   * @param {Object} [options]
    *  - {Boolean} reference
    *  - {Boolean} merge
    */
@@ -199,38 +161,6 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isRootKey (key) {
-    return key ? (key.charAt(0) == '/') : false;
-  }
-
-  /**
-   * Determine if 'key' matches 'match'
-   * @param {String} key
-   * @param {RegExp} match
-   * @returns {Boolean}
-   */
-  isMatchKey (key, match) {
-    // Treat no match as match all
-    if (!match) return true;
-    if (match instanceof RegExp) return match.test(key);
-    return false;
-  }
-
-  /**
-   * Retrieve global version of 'key'
-   * @param {String} key
-   * @returns {String}
-   */
-  getRootKey (key = '') {
-    if (!this.isRootKey(key)) key = `/${key}`;
-    return key;
-  }
-
-  /**
    * Retrieve an instance reference at 'key' to a subset of data
    * @param {String} key
    * @returns {DataStore}
@@ -251,7 +181,7 @@ module.exports = class DataStore extends Emitter {
 
   /**
    * Store serialisability of 'key'
-   * @param {String} key
+   * @param {String|Object} key
    * @param {Boolean} value
    */
   setSerialisableKey (key, value) {
@@ -299,6 +229,75 @@ module.exports = class DataStore extends Emitter {
   toJSON (key) {
     if (key) return serialise(key, get(this, key), this._serialisableKeys);
     return serialise(null, this._data, this._serialisableKeys);
+  }
+
+  /**
+   * Determine if 'key' refers to a global property
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  isRootKey (key) {
+    return key ? (key.charAt(0) == '/') : false;
+  }
+
+  /**
+   * Determine if 'key' matches 'match'
+   * @param {String} key
+   * @param {RegExp} match
+   * @returns {Boolean}
+   */
+  isMatchKey (key, match) {
+    // Treat no match as match all
+    if (!match) return true;
+    if (match instanceof RegExp) return match.test(key);
+    return false;
+  }
+
+  /**
+   * Retrieve global version of 'key'
+   * @param {String} key
+   * @returns {String}
+   */
+  getRootKey (key = '') {
+    if (!this.isRootKey(key)) key = `/${key}`;
+    return key;
+  }
+
+  /**
+   * Route 'fn' through 'handlers'
+   * @param {Function} fn
+   * @param {Array} signature
+   * @param {Object} handlers
+   * @param {*} args
+   * @returns {Object|null}
+   */
+  _routeHandledMethod (fn, signature, handlers, ...args) {
+    const isKeyed = signature[0] == 'key';
+    let [key, ...rest] = args;
+
+    if (isKeyed && key && key.charAt(0) == '/') key = key.slice(1);
+
+    // Defer to handlers
+    if (handlers && handlers.length) {
+      const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this.isMatchKey(key, match));
+      let context = getHandlerContext(signature, args);
+
+      for (let i = 0, n = matchingHandlers.length; i < n; i++) {
+        const returnValue = matchingHandlers[i].handler(this, context);
+
+        // Abort on first return value
+        if (returnValue !== undefined) return returnValue;
+        if (i == n - 1) {
+          args = applyHandlerContext(signature, context);
+          return isKeyed
+            // Handlers can potentially re-batch keys, so unbatch
+            ? unbatchKeyedFunctionCall(fn, ...args)
+            : fn(...args);
+        }
+      }
+    }
+
+    return fn(key, ...rest);
   }
 };
 
