@@ -12,16 +12,16 @@ const Debug = require('debug');
 const Emitter = require('eventemitter3');
 const get = require('./methods/get');
 const isPlainObject = require('is-plain-obj');
+const remove = require('./methods/remove');
 const set = require('./methods/set');
-const unset = require('./methods/unset');
 const update = require('./methods/update');
 
 const HANDLED_METHODS = {
   destroy: [destroy, []],
   get: [get, ['key']],
   reset: [reset, ['data']],
+  remove: [remove, ['key']],
   set: [set, ['key', 'value', 'options']],
-  unset: [unset, ['key']],
   update: [update, ['key', 'value', 'options', '...args']]
 };
 const REFERENCE_KEY = '__ref';
@@ -175,8 +175,8 @@ module.exports = class DataStore extends Emitter {
    * Remove 'key'
    * @param {String} key
    */
-  unset (key) {
-    unbatchKeyedFunctionCall(this._handledMethods.unset, key);
+  remove (key) {
+    unbatchKeyedFunctionCall(this._handledMethods.remove, key);
   }
 
   /**

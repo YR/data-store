@@ -9,7 +9,7 @@ const load = require('../src/lib/methods/load');
 const nock = require('nock');
 const reload = require('../src/lib/methods/reload');
 const set = require('../src/lib/methods/set');
-const unset = require('../src/lib/methods/unset');
+const remove = require('../src/lib/methods/remove');
 const update = require('../src/lib/methods/update');
 
 const storage = {
@@ -76,13 +76,13 @@ describe('DataStore', function () {
     });
   });
 
-  describe('unset()', function () {
+  describe('remove()', function () {
     it('should remove a key', function () {
-      unset(store, 'bar');
+      remove(store, 'bar');
       expect(get(store, 'bar')).to.eql(undefined);
     });
     it('should not remove a key that doesn\'t exist', function () {
-      unset(store, 'zing');
+      remove(store, 'zing');
       expect(get(store, 'zing')).to.eql(undefined);
     });
   });
@@ -196,25 +196,25 @@ describe('DataStore', function () {
       });
     });
 
-    describe('unset()', function () {
+    describe('remove()', function () {
       it('should remove a key', function (done) {
-        store.on('unset:bar', (value, oldValue) => {
+        store.on('remove:bar', (value, oldValue) => {
           expect(value).to.equal(null);
           expect(oldValue).to.equal('bat');
           expect(store.get('bar')).to.eql(undefined);
           done();
         });
-        store.unset('bar');
+        store.remove('bar');
       });
       it('should not remove a key that doesn\'t exist', function (done) {
-        store.on('unset', (value, oldValue) => {
+        store.on('remove', (value, oldValue) => {
           throw new Error('nope');
         });
         setTimeout(() => {
           expect(store.get('zing')).to.eql(undefined);
           done();
         }, 40);
-        store.unset('zing');
+        store.remove('zing');
       });
     });
 
