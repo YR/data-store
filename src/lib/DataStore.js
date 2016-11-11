@@ -7,7 +7,7 @@
 
 'use strict';
 
-const Cursor = require('./cursor');
+const Cursor = require('./DataStoreCursor');
 const Debug = require('debug');
 const Emitter = require('eventemitter3');
 const get = require('./methods/get');
@@ -241,7 +241,7 @@ module.exports = class DataStore extends Emitter {
 
     // Create and store
     if (!cursor) {
-      cursor = Cursor.create(key, this);
+      cursor = new Cursor(key, this);
       this._cursors[key] = cursor;
     }
 

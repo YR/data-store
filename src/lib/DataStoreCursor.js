@@ -2,17 +2,7 @@
 
 const keys = require('@yr/keys');
 
-/**
- * Instance factory
- * @param {String} key
- * @param {DataStore} dataStore
- * @returns {DataStoreCursor}
- */
-exports.create = function create (key, dataStore) {
-  return new DataStoreCursor(key, dataStore);
-};
-
-class DataStoreCursor {
+module.exports = class DataStoreCursor {
   /**
    * Constructor
    * @param {String} key
