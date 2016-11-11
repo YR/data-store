@@ -2,6 +2,7 @@
 
 const clock = require('@yr/clock');
 const keys = require('@yr/keys');
+const set = require('./set');
 
 /**
  * Store prop 'key' with 'value', notifying listeners of change
@@ -16,6 +17,7 @@ const keys = require('@yr/keys');
 module.exports = function update (store, key, value, options, ...args) {
   options = options || {};
 
+  // TODO: move to set()
   // Resolve reference keys (use reference key to write to original object)
   const parent = store.get(keys.slice(key, 0, -1));
 
@@ -26,9 +28,7 @@ module.exports = function update (store, key, value, options, ...args) {
   const oldValue = store.get(key);
   // TODO: bail if no oldValue?
 
-  options.immutable = true;
-  // TODO: avoid routing/handling by using set() directly?
-  store.set(key, value, options);
+  set(store, key, value, options);
 
   // Delay to prevent race condition
   clock.immediate(() => {
