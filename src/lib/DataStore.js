@@ -91,7 +91,7 @@ module.exports = class DataStore extends Emitter {
   /**
    * Register 'handler' for 'methodName' with 'match'
    * @param {String} methodName
-   * @param {String|RegExp} match
+   * @param {RegExp} match
    * @param {Function} handler
    */
   registerMethodHandler (methodName, match, handler) {
@@ -206,14 +206,14 @@ module.exports = class DataStore extends Emitter {
   /**
    * Determine if 'key' matches 'match'
    * @param {String} key
-   * @param {String|RegExp} match
+   * @param {RegExp} match
    * @returns {Boolean}
    */
   isMatchKey (key, match) {
+    // Treat no match as match all
+    if (!match) return true;
     if (match instanceof RegExp) return match.test(key);
-    if (key == null && !match) return true;
-    // Will match if match == ''
-    return key.indexOf(match) == 0;
+    return false;
   }
 
   /**

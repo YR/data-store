@@ -437,23 +437,13 @@ describe('DataStore', function () {
         it('should allow handling', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', '', function (store, context) {
+          store.registerMethodHandler('get', null, function (store, context) {
             run++;
           });
           expect(store.get('bar')).to.equal('bat');
           expect(run).to.equal(1);
         });
-        it('should allow namespaced handling', function () {
-          let run = 0;
-
-          store.registerMethodHandler('get', 'foo', function (store, context) {
-            run++;
-            expect(context.key).to.equal('foo/bar');
-          });
-          expect(store.get('foo/bar')).to.equal('boo');
-          expect(run).to.equal(1);
-        });
-        it('should allow regex matched handling', function () {
+        it('should allow matched handling', function () {
           let run = 0;
 
           store.registerMethodHandler('get', /foo\/[a-z]ar/, function (store, context) {
@@ -466,7 +456,7 @@ describe('DataStore', function () {
         it('should allow delegation for computed values', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', 'foo/bar', function (store, context) {
+          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (store, context) {
             run++;
             return `${store.get('bar')} ${store.get('boo')}`;
           });
@@ -476,10 +466,10 @@ describe('DataStore', function () {
         it('should allow multiple delegates', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', 'foo', function (store, context) {
+          store.registerMethodHandler('get', /foo/, function (store, context) {
             run++;
           });
-          store.registerMethodHandler('get', 'foo', function (store, context) {
+          store.registerMethodHandler('get', /foo/, function (store, context) {
             run++;
           });
           expect(store.get('foo/bar')).to.equal('boo');
@@ -491,7 +481,7 @@ describe('DataStore', function () {
         it('should allow delegation', function () {
           let run = 0;
 
-          store.registerMethodHandler('set', 'zing', function (store, context) {
+          store.registerMethodHandler('set', /zing/, function (store, context) {
             run++;
             context.value = 'bar';
             expect(context.key).to.equal('zing');
@@ -503,11 +493,11 @@ describe('DataStore', function () {
         it('should allow multiple delegates', function () {
           let run = 0;
 
-          store.registerMethodHandler('set', 'zing', function (store, context) {
+          store.registerMethodHandler('set', /zing/, function (store, context) {
             run++;
             context.value = 'bar';
           });
-          store.registerMethodHandler('set', 'zing', function (store, context) {
+          store.registerMethodHandler('set', /zing/, function (store, context) {
             run++;
             context.key = {
               [context.key]: context.value,
@@ -834,7 +824,7 @@ describe('FetchableDataStore', function () {
           .get('/foo')
           .reply(200, { foo: 'foo' });
         store.set('foo/__expires', 0);
-        store.registerMethodHandlers(handlers.fetchWithTemplatedURL('foo', 'http://localhost/{page}', {}));
+        store.registerMethodHandlers(handlers.fetchWithTemplatedURL(/foo/, 'http://localhost/{page}', {}));
 
         return store
           .fetch('foo', { page: 'foo' })
@@ -847,7 +837,7 @@ describe('FetchableDataStore', function () {
           .get('/foo')
           .reply(200, { foo: 'foo' });
         store.set('foo/__expires', 0);
-        store.registerMethodHandlers(handlers.fetchWithTemplatedURL('foo', 'http://localhost/{page}', { staleWhileRevalidate: true }));
+        store.registerMethodHandlers(handlers.fetchWithTemplatedURL(/foo/, 'http://localhost/{page}', { staleWhileRevalidate: true }));
 
         return store
           .fetch('foo', { page: 'foo' })
