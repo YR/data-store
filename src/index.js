@@ -9,8 +9,6 @@
 
 const DataStore = require('./lib/DataStore');
 const FetchableDataStore = require('./lib/FetchableDataStore');
-const fetchWithTemplatedURL = require('./lib/handlers/fetchWithTemplatedURL');
-const persistToStorage = require('./lib/handlers/persistToStorage');
 
 module.exports = {
   /**
@@ -29,10 +27,5 @@ module.exports = {
       return new FetchableDataStore(id, data, options);
     }
     return new DataStore(id, data, options);
-  },
-
-  handlers: {
-    fetchWithTemplatedURL,
-    persistToStorage
   }
 };

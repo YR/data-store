@@ -21,14 +21,6 @@
   version "1.1.3"
   resolved "https://registry.yarnpkg.com/@yr/keys/-/keys-1.1.3.tgz#0d5060a5ba77f78fbdfe8670ee9bd54a9cf26713"
 
-"@yr/local-storage@1.1.X":
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/@yr/local-storage/-/local-storage-1.1.0.tgz#7cee6f1ce6f38e67afae74018bbb30bcc4d8963a"
-  dependencies:
-    "@yr/clock" "1.1.x"
-    debug "2.3.x"
-    object-assign "4.1.x"
-
 "@yr/property@5.1.x":
   version "5.1.1"
   resolved "https://registry.yarnpkg.com/@yr/property/-/property-5.1.1.tgz#a2d7f12b300faf3d8a4fea61a971ddc83bd26c1b"
@@ -2131,8 +2123,8 @@ reduce-function-call@^1.0.1:
     balanced-match "~0.1.0"
 
 regenerate@^1.2.1:
-  version "1.3.1"
-  resolved "https://registry.yarnpkg.com/regenerate/-/regenerate-1.3.1.tgz#0300203a5d2fdcf89116dce84275d011f5903f33"
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/regenerate/-/regenerate-1.3.2.tgz#d1941c67bad437e1be76433add5b385f95b19260"
 
 regenerator-runtime@^0.9.5:
   version "0.9.6"

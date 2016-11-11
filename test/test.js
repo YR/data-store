@@ -1,6 +1,6 @@
 'use strict';
 
-const { create: createStore, handlers } = require('../src/index');
+const { create: createStore } = require('../src/index');
 const agent = require('@yr/agent');
 const expect = require('expect.js');
 const fetch = require('../src/lib/methods/fetch');
@@ -9,7 +9,6 @@ const load = require('../src/lib/methods/load');
 const nock = require('nock');
 const reload = require('../src/lib/methods/reload');
 const set = require('../src/lib/methods/set');
-const storage = require('@yr/local-storage');
 const remove = require('../src/lib/methods/remove');
 const update = require('../src/lib/methods/update');
 
@@ -486,53 +485,6 @@ describe('DataStore', function () {
       });
     });
   });
-
-  describe('handlers', function () {
-    describe('persistToStorage', function () {
-      before(function () {
-        storage.clear();
-        storage.init({ version: { foo: 1 }, writeDelay: 0 });
-      });
-      beforeEach(function () {
-        store.destroy();
-      });
-      afterEach(function () {
-        storage.clear();
-      });
-
-      it('should instantiate store with storage data', function () {
-        storage.set('foo/bar', { boo: 'bat' });
-        store = createStore('store', null, { handlers: handlers.persistToStorage(/foo/, storage, 2) });
-        expect(store._data).to.eql({ foo: { bar: { boo: 'bat' } } });
-        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'bat' } });
-      });
-      it('should instantiate with storage data and passed data', function () {
-        storage.set('foo/bar', { boo: 'bat' });
-        store = createStore('store', { foo: { bat: 'boo' }, bar: 'bar' }, { handlers: handlers.persistToStorage(/foo/, storage, 2) });
-        expect(store._data).to.eql({ foo: { bar: { boo: 'bat' }, bat: 'boo' }, bar: 'bar' });
-        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'bat' } });
-      });
-      it('should instantiate with storage data, upgrading if necessary', function () {
-        storage.set('foo/bar', { boo: 'bat' });
-        storage.init({ version: { foo: 2 }, writeDelay: 0 });
-        store = createStore('store', null, { handlers: handlers.persistToStorage(/foo/, storage, 2, (key, value) => 'foo') });
-        expect(store._data).to.eql({ foo: { bar: 'foo' } });
-        expect(storage.get('foo')).to.eql({ 'foo/bar': 'foo' });
-      });
-      it('should persist data to storage when set', function () {
-        store = createStore('store', { foo: { bat: 'boo' }, bar: 'bar' }, { handlers: handlers.persistToStorage(/foo\/bar/, storage, 2) });
-        store.set('foo/bar', { boo: 'foo' });
-        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'foo' } });
-      });
-      it('should unpersist data to storage when removed', function () {
-        store = createStore('store', { foo: { bat: 'boo' }, bar: 'bar' }, { handlers: handlers.persistToStorage(/foo\/bar/, storage, 2) });
-        store.set('foo/bar', { boo: 'foo' });
-        expect(storage.get('foo')).to.eql({ 'foo/bar': { boo: 'foo' } });
-        store.remove('foo/bar');
-        expect(storage.get('foo')).to.eql({ });
-      });
-    });
-  });
 });
 
 describe('FetchableDataStore', function () {
@@ -749,44 +701,6 @@ describe('FetchableDataStore', function () {
         .catch((err) => {
           done(err);
         });
-    });
-  });
-
-  describe('handlers', function () {
-    describe('fetchWithTemplatedURL', function () {
-      beforeEach(function () {
-        fake = nock('http://localhost');
-      });
-      afterEach(function () {
-        nock.cleanAll();
-      });
-
-      it('should handle fetching with url template values', function () {
-        fake
-          .get('/foo')
-          .reply(200, { foo: 'foo' });
-        store.set('foo/__expires', 0);
-        store.registerMethodHandlers(handlers.fetchWithTemplatedURL(/foo/, 'http://localhost/{page}', {}));
-
-        return store
-          .fetch('foo', { page: 'foo' })
-          .then((value) => {
-            expect(value.data).to.have.property('foo', 'foo');
-          });
-      });
-      it('should handle fetching with default options', function () {
-        fake
-          .get('/foo')
-          .reply(200, { foo: 'foo' });
-        store.set('foo/__expires', 0);
-        store.registerMethodHandlers(handlers.fetchWithTemplatedURL(/foo/, 'http://localhost/{page}', { staleWhileRevalidate: true }));
-
-        return store
-          .fetch('foo', { page: 'foo' })
-          .then((value) => {
-            expect(value.data).to.have.property('bar', 'boo');
-          });
-      });
     });
   });
 });
