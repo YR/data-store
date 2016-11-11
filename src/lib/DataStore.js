@@ -34,7 +34,7 @@ module.exports = class DataStore extends Emitter {
    * @param {String} [id]
    * @param {Object} [data]
    * @param {Object} [options]
-   *  - {Array} handlers
+   *  - {Object} handlers
    *  - {Boolean} isWritable
    *  - {Object} serialisableKeys
    */
@@ -95,6 +95,7 @@ module.exports = class DataStore extends Emitter {
    * @param {Function} handler
    */
   registerMethodHandler (methodName, match, handler) {
+    if (!this._handlers[methodName]) throw Error(`${methodName} is not a recognised method for handling`);
     this._handlers[methodName].push({ handler, match });
   }
 
