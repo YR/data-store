@@ -7,6 +7,32 @@ const reload = require('./reload');
 
 /**
  * Fetch data. If expired, load from 'url' and store at 'key'
+ * Hash of 'key:url' pairs batches calls
+ * @param {DataStore} store
+ * @param {String|Object} key
+ * @param {String} url
+ * @param {Object} options
+ *  - {Boolean} abort
+ *  - {Boolean} ignoreQuery
+ *  - {Number} minExpiry
+ *  - {Boolean} reload
+ *  - {Number} retry
+ *  - {Boolean} staleWhileRevalidate
+ *  - {Boolean} staleIfError
+ *  - {Number} timeout
+ * @returns {Promise}
+ */
+module.exports = function fetch (store, key, url, options = {}) {
+  if (!key) return;
+
+  if ('string' == typeof key) return doFetch(store, key, url, options);
+  if (isPlainObject(key)) {
+    return Promise.all(Object.keys(key).map((k) => doFetch(store, k, key[k], options)));
+  }
+};
+
+/**
+ * Fetch data. If expired, load from 'url' and store at 'key'
  * @param {DataStore} store
  * @param {String} key
  * @param {String} url
@@ -21,9 +47,8 @@ const reload = require('./reload');
  *  - {Number} timeout
  * @returns {Promise}
  */
-module.exports = function fetch (store, key, url, options = {}) {
+function doFetch (store, key, url, options) {
   const { reload: shouldReload, staleWhileRevalidate, staleIfError } = options;
-
   const value = get(store, key);
   const isMissingOrExpired = !value || hasExpired(value, store.EXPIRES_KEY);
 
@@ -66,7 +91,7 @@ module.exports = function fetch (store, key, url, options = {}) {
     headers: { status: 200 },
     data: value
   });
-};
+}
 
 /**
  * Check if 'obj' has expired

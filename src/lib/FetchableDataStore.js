@@ -3,6 +3,7 @@
 const assign = require('object-assign');
 const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
+const isPlainObject = require('is-plain-obj');
 
 const DEFAULT_LOAD_OPTIONS = {
   minExpiry: 60000,
@@ -31,7 +32,8 @@ module.exports = class FetchableDataStore extends DataStore {
 
   /**
    * Fetch data. If expired, load from 'url' and store at 'key'
-   * @param {String} key
+   * Hash of 'key:url' pairs batches calls
+   * @param {String|Object} key
    * @param {String} url
    * @param {Object} options
    *  - {Boolean} abort
@@ -44,10 +46,13 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Number} timeout
    * @returns {Promise}
    */
-  fetch (key, url, options = {}) {
-    // TODO: accept array of keys
+  fetch (key, url, options) {
+    if (!key) return;
     options = assign({}, DEFAULT_LOAD_OPTIONS, options);
-    return this._handledMethods.fetch(key, url, options);
+    if ('string' == typeof key) return this._handledMethods.fetch(key, url, options);
+    if (isPlainObject(key)) {
+      return Promise.all(Object.keys(key).map((k) => this._handledMethods.fetch(k, key[k], options)));
+    }
   }
 };
 
