@@ -1,38 +1,56 @@
 'use strict';
 
 const clock = require('@yr/clock');
-const keys = require('@yr/keys');
-const set = require('./set');
+const get = require('./get');
+const isPlainObject = require('is-plain-obj');
 
 /**
- * Store prop 'key' with 'value', notifying listeners of change
+ * Store 'value' at 'key', notifying listeners of change
+ * Allows passing of arbitrary additional args to listeners
+ * Hash of 'key:value' pairs batches changes
+ * @param {DataStore} store
+ * @param {String} key
+ * @param {Object} value
+ * @param {Object} [options]
+ *  - {Boolean} merge
+ * @returns {null}
+ */
+module.exports = function update (store, key, value, options, ...args) {
+  if (!key) return;
+
+  options = options || {};
+
+  if ('string' == typeof key) return doUpdate(store, key, value, options, ...args);
+  if (isPlainObject(key)) {
+    for (const k in key) {
+      doUpdate(store, k, key[k], options, ...args);
+    }
+  }
+};
+
+/**
+ * Store 'value' at 'key', notifying listeners of change
  * Allows passing of arbitrary additional args to listeners
  * @param {DataStore} store
  * @param {String} key
  * @param {Object} value
- * @param {Object} options
- *  - {Boolean} reference
+ * @param {Object} [options]
  *  - {Boolean} merge
  */
-module.exports = function update (store, key, value, options, ...args) {
-  options = options || {};
-
-  // TODO: move to set()
-  // Resolve reference keys (use reference key to write to original object)
-  const parent = store.get(keys.slice(key, 0, -1));
-
-  if (parent && parent[store.REFERENCE_KEY]) key = keys.join(parent[store.REFERENCE_KEY], keys.last(key));
+function doUpdate (store, key, value, options, ...args) {
+  if (key.charAt(0) == '/') key = key.slice(1);
 
   store.debug('update %s', key);
 
-  const oldValue = store.get(key);
+  const oldValue = get(store, key);
   // TODO: bail if no oldValue?
 
-  set(store, key, value, options);
+  // Enable handling
+  store.set(key, value, options);
 
-  // Delay to prevent race condition
+  // Delay to prevent potential race conditions
   clock.immediate(() => {
     store.emit(`update:${key}`, value, oldValue, options, ...args);
     store.emit('update', key, value, oldValue, options, ...args);
   });
-};
+}

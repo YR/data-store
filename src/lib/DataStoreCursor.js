@@ -21,7 +21,7 @@ module.exports = class DataStoreCursor {
   get (key) {
     const fixKey = (key) => {
       // Prefix with cursor key if not root
-      return (!this.dataStore.isRootKey(key))
+      return (!this._isRootKey(key))
         ? keys.join(this.key, key)
         : key;
     };
@@ -53,7 +53,7 @@ module.exports = class DataStoreCursor {
 
     // Fix keys (prefix with cursor key if not root)
     for (const k in key) {
-      if (!this.dataStore.isRootKey(k)) {
+      if (!this._isRootKey(k)) {
         key[keys.join(this.key, k)] = key[k];
         delete key[k];
       }
@@ -77,5 +77,14 @@ module.exports = class DataStoreCursor {
    */
   destroy () {
     this.dataStore = null;
+  }
+
+  /**
+   * Determine if 'key' is global
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  _isRootKey (key) {
+    return key ? (key.charAt(0) == '/') : false;
   }
 };

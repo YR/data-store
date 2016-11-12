@@ -21,8 +21,7 @@ const HANDLED_METHODS = {
   get: [get, ['key']],
   reset: [reset, ['data']],
   remove: [remove, ['key']],
-  set: [set, ['key', 'value', 'options']],
-  update: [update, ['key', 'value', 'options', '...args']]
+  set: [set, ['key', 'value', 'options']]
 };
 const REFERENCE_KEY = '__ref';
 
@@ -52,6 +51,7 @@ module.exports = class DataStore extends Emitter {
     this._data = {};
     this._handledMethods = {};
     this._handlers = {};
+    this._references = {};
     this._serialisableKeys = options.serialisableKeys || {};
 
     for (const methodName in HANDLED_METHODS) {
@@ -100,49 +100,61 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
-   * Retrieve property value with `key`
-   * @param {String} [key]
-   * @returns {Object}
+   * Retrieve value stored at 'key'
+   * Empty 'key' returns all data
+   * Array of keys returns array of values
+   * @param {String|Array} [key]
+   * @returns {*}
    */
   get (key) {
-    return unbatchKeyedFunctionCall(this._handledMethods.get, key);
+    if (!key || 'string' == typeof key) return this._handledMethods.get(key);
+    if (Array.isArray(key)) return key.map((k) => this._handledMethods.get(k));
   }
 
   /**
-   * Store prop 'key' with 'value'
-   * Returns stored value
+   * Store 'value' at 'key'
+   * Hash of 'key:value' pairs batches changes
    * @param {String} key
    * @param {*} value
    * @param {Object} [options]
    *  - {Boolean} immutable
-   *  - {Boolean} reference
    *  - {Boolean} merge
+   * @returns {null}
    */
   set (key, value, options) {
     if (!this.isWritable || !key) return;
-    unbatchKeyedFunctionCall(this._handledMethods.set, key, value, options);
+    if ('string' == typeof key) return this._handledMethods.set(key, value, options);
+    if (isPlainObject(key)) {
+      for (const k in key) {
+        this._handledMethods.set(k, key[k], options);
+      }
+    }
   }
 
   /**
-   * Store prop 'key' with 'value', notifying listeners of change
+   * Store 'value' at 'key', notifying listeners of change
    * Allows passing of arbitrary additional args to listeners
+   * Hash of 'key:value' pairs batches changes
    * @param {String} key
    * @param {Object} value
    * @param {Object} [options]
-   *  - {Boolean} reference
    *  - {Boolean} merge
    */
   update (key, value, options, ...args) {
     if (!this.isWritable || !key) return;
-    unbatchKeyedFunctionCall(this._handledMethods.update, key, value, options, ...args);
+    update(this, key, value, options, ...args);
   }
 
   /**
    * Remove 'key'
+   * Array of keys batch removes values
    * @param {String} key
+   * @returns {null}
    */
   remove (key) {
-    unbatchKeyedFunctionCall(this._handledMethods.remove, key);
+    if (!this.isWritable || !key) return;
+    if ('string' == typeof key) return this._handledMethods.remove(key);
+    if (Array.isArray(key)) return key.map((k) => this._handledMethods.remove(k));
   }
 
   /**
@@ -166,7 +178,9 @@ module.exports = class DataStore extends Emitter {
    * @returns {DataStore}
    */
   createCursor (key) {
-    key = this.getRootKey(key);
+    key = key || '';
+    // Prefix all keys with separator
+    if (key && key.charAt(0) != '/') key = `/${key}`;
 
     let cursor = this._cursors[key];
 
@@ -231,13 +245,33 @@ module.exports = class DataStore extends Emitter {
     return serialise(null, this._data, this._serialisableKeys);
   }
 
-  /**
-   * Determine if 'key' refers to a global property
-   * @param {String} key
-   * @returns {Boolean}
-   */
-  isRootKey (key) {
-    return key ? (key.charAt(0) == '/') : false;
+  _createReference (key, value) {
+    if (!isPlainObject(value)) return;
+
+    const rootKey = this._getRootKey(key);
+
+    value[REFERENCE_KEY] = rootKey;
+    this._references[rootKey] = [];
+  }
+
+  _updateReference (key, value) {
+    if (!isPlainObject(value) || !value[REFERENCE_KEY]) return;
+
+    const rootKey = this._getRootKey(key);
+    const refKey = value[REFERENCE_KEY];
+
+    if (refKey != rootKey) {
+      // Unreference
+      if (this._references[rootKey]) {
+
+      }
+      this._references[rootKey] = refKey;
+
+    }
+  }
+
+  _isReferenceKey (key) {
+
   }
 
   /**
@@ -246,21 +280,11 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp} match
    * @returns {Boolean}
    */
-  isMatchKey (key, match) {
+  _isMatchKey (key, match) {
     // Treat no match as match all
     if (!match) return true;
     if (match instanceof RegExp) return match.test(key);
     return false;
-  }
-
-  /**
-   * Retrieve global version of 'key'
-   * @param {String} key
-   * @returns {String}
-   */
-  getRootKey (key = '') {
-    if (!this.isRootKey(key)) key = `/${key}`;
-    return key;
   }
 
   /**
@@ -279,7 +303,7 @@ module.exports = class DataStore extends Emitter {
 
     // Defer to handlers
     if (handlers && handlers.length) {
-      const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this.isMatchKey(key, match));
+      const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this._isMatchKey(key, match));
       let context = getHandlerContext(signature, args);
 
       for (let i = 0, n = matchingHandlers.length; i < n; i++) {
@@ -288,11 +312,7 @@ module.exports = class DataStore extends Emitter {
         // Abort on first return value
         if (returnValue !== undefined) return returnValue;
         if (i == n - 1) {
-          args = applyHandlerContext(signature, context);
-          return isKeyed
-            // Handlers can potentially re-batch keys, so unbatch
-            ? unbatchKeyedFunctionCall(fn, ...args)
-            : fn(...args);
+          return fn(...applyHandlerContext(signature, context));
         }
       }
     }
@@ -300,26 +320,6 @@ module.exports = class DataStore extends Emitter {
     return fn(key, ...rest);
   }
 };
-
-/**
- * Unbatch potentially batched 'key'
- * @param {Function} fn
- * @param {String|Array|Object} [key]
- * @param {*} [args]
- * @returns {*}
- */
-function unbatchKeyedFunctionCall (fn, key, ...args) {
-  if (!key || 'string' == typeof key) return fn(key, ...args);
-  // Array of keys
-  if (Array.isArray(key)) return key.map((k) => fn(k, ...args));
-  // Object of key:value
-  if (isPlainObject(key)) {
-    for (const k in key) {
-      fn(k, key[k], ...args);
-    }
-    return;
-  }
-}
 
 /**
  * Retrieve context object for 'signature' and 'args'
@@ -390,6 +390,7 @@ function destroy (store) {
   store._cursors = {};
   store._data = {};
   store._handlers = {};
+  store._references = {};
   store._serialisableKeys = {};
   store.removeAllListeners();
 }

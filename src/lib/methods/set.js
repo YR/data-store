@@ -13,24 +13,39 @@ const DEFAULT_OPTIONS = {
 };
 
 /**
- * Store prop 'key' with 'value'
- * Returns stored value
+ * Store 'value' at 'key'
+ * Hash of 'key:value' pairs batches changes
+ * @param {DataStore} store
+ * @param {String|Object} key
+ * @param {*} value
+ * @param {Object} [options]
+ *  - {Boolean} immutable
+ *  - {Boolean} merge
+ * @returns {null}
+ */
+module.exports = function set (store, key, value, options) {
+  if (!key) return;
+
+  options = assign({}, DEFAULT_OPTIONS, options);
+
+  if ('string' == typeof key) return doSet(store, key, value, options);
+  if (isPlainObject(key)) {
+    for (const k in key) {
+      doSet(store, k, key[k], options);
+    }
+  }
+};
+
+/**
+ * Store 'value' at 'key'
  * @param {DataStore} store
  * @param {String} key
  * @param {*} value
  * @param {Object} [options]
  *  - {Boolean} immutable
- *  - {Boolean} reference
  *  - {Boolean} merge
- * @returns {*}
  */
-module.exports = function set (store, key, value, options) {
-  options = assign({}, DEFAULT_OPTIONS, options);
-
-  // TODO: check if value already has reference and track
-  // Write reference key
-  if (options.reference && isPlainObject(value)) value[store.REFERENCE_KEY] = store.getRootKey(key);
-
+function doSet (store, key, value, options) {
   if (options.immutable) {
     // Returns same if no change
     const newData = property.set(store._data, key, value, options);
@@ -40,9 +55,8 @@ module.exports = function set (store, key, value, options) {
     } else {
       store.debug('WARNING no change after set "%s', key);
     }
-  } else {
-    property.set(store._data, key, value, options);
+    return;
   }
 
-  return value;
-};
+  property.set(store._data, key, value, options);
+}

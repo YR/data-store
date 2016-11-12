@@ -3,13 +3,15 @@
 const property = require('@yr/property');
 
 /**
- * Retrieve property value with `key`
+ * Retrieve value stored at 'key'
+ * Empty 'key' returns all data
+ * Array of keys returns array of values
  * @param {DataStore} store
  * @param {String} [key]
  * @returns {*}
  */
 module.exports = function get (store, key) {
-  // Return all if no key specified
   if (!key) return store._data;
-  return property.get(store._data, key);
+  if ('string' == typeof key) return property.get(store._data, key);
+  if (Array.isArray(key)) return key.map((k) => property.get(store._data, k));
 };

@@ -33,18 +33,37 @@ describe('DataStore', function () {
   });
 
   describe('get()', function () {
-    it('should return the property\'s value', function () {
+    it('should return a value for a string key', function () {
       expect(get(store, 'bar')).to.equal('bat');
+      expect(get(store, '/bar')).to.equal('bat');
     });
-    it('should return all properties if no key specified', function () {
+    it('should return an array of values for an array of string keys', function () {
+      expect(get(store, ['bar', 'boo'])).to.eql(['bat', 'foo']);
+    });
+    it('should return all data if no key specified', function () {
       expect(get(store).bar).to.equal('bat');
     });
   });
 
   describe('set()', function () {
-    it('should modify a property\'s value when called with simple key', function () {
+    it('should do nothing if called with missing key', function () {
+      const data = store._data;
+
+      set(store, '', 'bar');
+      set(store, null, 'bar');
+      expect(store._data).to.equal(data);
+    });
+    it('should store a value when called with simple key', function () {
       set(store, 'foo', 'bar');
       expect(store._data.foo).to.equal('bar');
+    });
+    it('should allow batch writes', function () {
+      set(store, {
+        '/test': 'success',
+        'boop/bar': 'foo'
+      });
+      expect(store._data.test).to.equal('success');
+      expect(store._data.boop).to.have.property('bar', 'foo');
     });
   });
 
@@ -52,6 +71,11 @@ describe('DataStore', function () {
     it('should remove a key', function () {
       remove(store, 'bar');
       expect(get(store, 'bar')).to.eql(undefined);
+    });
+    it('should remove an array of keys', function () {
+      remove(store, ['bar', 'boo']);
+      expect(get(store, 'bar')).to.eql(undefined);
+      expect(get(store, 'boo')).to.eql(undefined);
     });
     it('should not remove a key that doesn\'t exist', function () {
       remove(store, 'zing');
@@ -104,42 +128,34 @@ describe('DataStore', function () {
       });
     });
 
-    describe('getRootKey()', function () {
-      it('should not modify an existing global key', function () {
-        expect(store.getRootKey('/foo')).to.equal('/foo');
-      });
-      it('should modify an existing local key', function () {
-        expect(store.getRootKey('foo')).to.equal('/foo');
-      });
-    });
-
     describe('get()', function () {
-      it('should return the property\'s value', function () {
+      it('should return a value for a string key', function () {
         expect(store.get('bar')).to.equal('bat');
+        expect(store.get('/bar')).to.equal('bat');
       });
-      it('should return all properties if no key specified', function () {
-        expect(store.get().bar).to.equal('bat');
-      });
-      it('should return a root property\'s value', function () {
-        expect(store.get('/foo/bar')).to.equal('boo');
-      });
-      it('should return an array of values when passed an array of keys', function () {
+      it('should return an array of values for an array of string keys', function () {
         expect(store.get(['bar', 'boo'])).to.eql(['bat', 'foo']);
+      });
+      it('should return all data if no key specified', function () {
+        expect(store.get().bar).to.equal('bat');
       });
     });
 
     describe('set()', function () {
-      it('should modify a property\'s value when called with simple key', function () {
+      it('should do nothing if called with missing key', function () {
+        const data = store._data;
+
+        store.set('', 'bar');
+        store.set(null, 'bar');
+        expect(store._data).to.equal(data);
+      });
+      it('should store a value when called with simple key', function () {
         store.set('foo', 'bar');
         expect(store._data.foo).to.equal('bar');
       });
-      it('should modify a root property\'s value', function () {
-        store.set('/foo/bar', 'bar');
-        expect(store._data.foo.bar).to.equal('bar');
-      });
       it('should allow batch writes', function () {
         store.set({
-          test: 'success',
+          '/test': 'success',
           'boop/bar': 'foo'
         });
         expect(store._data.test).to.equal('success');
@@ -150,21 +166,26 @@ describe('DataStore', function () {
         store.set('foo', 'bar');
         expect(store._data.foo).to.not.equal('bar');
       });
-      it.skip('should allow replacing all data when no key specified', function () {
-        const obj = { test: 'success' };
+    });
 
-        store.set(null, obj);
-        expect(store._data).to.eql(obj);
+    describe('remove()', function () {
+      it('should remove a key', function () {
+        store.remove('bar');
+        expect(store.get('bar')).to.eql(undefined);
       });
-      it.skip('should remove a key when null value specified', function () {
-        store.set('foo/boo', null);
-        expect(store.get('foo/boo')).to.eql(null);
-        expect(store.get('foo')).to.not.have.property('boo');
-        store.set('boo', null);
+      it('should remove an array of keys', function () {
+        store.remove(['bar', 'boo']);
+        expect(store.get('bar')).to.eql(undefined);
         expect(store.get('boo')).to.eql(undefined);
-        expect(store.get()).to.not.have.property('boo');
-        store.set('a', null);
-        expect(store.get()).to.not.have.property('a');
+      });
+      it('should not remove a key that doesn\'t exist', function () {
+        store.remove('zing');
+        expect(store.get('zing')).to.eql(undefined);
+      });
+      it('should do nothing if dataStore is not writable', function () {
+        store.isWritable = false;
+        store.remove('bar');
+        expect(store._data.bar).to.not.equal(undefined);
       });
     });
 
@@ -202,7 +223,7 @@ describe('DataStore', function () {
           expect(bool).to.be(true);
           done();
         });
-        store.update('bar', 'bar', undefined, 'foo', true);
+        store.update('bar', 'bar', null, 'foo', true);
       });
       it('should allow passing of additional arguments to listeners for batch writes', function (done) {
         const obj = { bar: 'bar', boo: 'boo' };
@@ -212,7 +233,7 @@ describe('DataStore', function () {
           expect(foo).to.equal('foo');
           if (++i == 2) done();
         });
-        store.update(obj, undefined, 'foo');
+        store.update(obj, null, null, 'foo');
       });
       it('should be ignored if dataStore is not "isWritable"', function () {
         store.isWritable = false;
