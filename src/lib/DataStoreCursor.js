@@ -14,9 +14,11 @@ module.exports = class DataStoreCursor {
   }
 
   /**
-   * Retrieve prop value with `key`
-   * @param {String} [key]
-   * @returns {Object}
+   * Retrieve value stored at 'key'
+   * Empty 'key' returns all data
+   * Array of keys returns array of values
+   * @param {String|Array} [key]
+   * @returns {*}
    */
   get (key) {
     const fixKey = (key) => {
@@ -37,11 +39,12 @@ module.exports = class DataStoreCursor {
   }
 
   /**
-   * Store prop 'key' with 'value', notifying listeners of change
-   * @param {String} key
+   * Store 'value' at 'key', notifying listeners of change
+   * Allows passing of arbitrary additional args to listeners
+   * Hash of 'key:value' pairs batches changes
+   * @param {String|Object} key
    * @param {Object} value
    * @param {Object} [options]
-   *  - {Boolean} reference
    *  - {Boolean} merge
    */
   update (key, value, options, ...args) {
@@ -69,7 +72,7 @@ module.exports = class DataStoreCursor {
    * @returns {DataStoreCursor}
    */
   createCursor (key) {
-    return new DataStoreCursor(keys.join(this.key, key), this.dataStore);
+    return this.dataStore.createCursor(keys.join(this.key, key));
   }
 
   /**

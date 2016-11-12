@@ -13,7 +13,7 @@ const GRACE = 10000;
  *  - {Boolean} abort
  *  - {Boolean} ignoreQuery
  *  - {Number} minExpiry
- *  - {Number} retry
+ *  - {Number} retries
  *  - {Number} timeout
  * @returns {Promise}
  */
@@ -26,7 +26,7 @@ module.exports = function load (store, key, url, options) {
   return agent
     .get(url, options)
     .timeout(options.timeout)
-    .retry(options.retry)
+    .retry(options.retries)
     .then((res) => {
       store.debug('loaded "%s" in %dms', key, res.duration);
 

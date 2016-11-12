@@ -27,7 +27,7 @@ module.exports = class FetchableDataStore extends DataStore {
 
     this.EXPIRES_KEY = EXPIRES_KEY;
 
-    this.registerHandledMethod('fetch', fetch, ['key', 'url', 'options']);
+    this._registerHandledMethod('fetch', fetch, ['key', 'url', 'options']);
   }
 
   /**
@@ -40,7 +40,7 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Boolean} ignoreQuery
    *  - {Number} minExpiry
    *  - {Boolean} reload
-   *  - {Number} retry
+   *  - {Number} retries
    *  - {Boolean} staleWhileRevalidate
    *  - {Boolean} staleIfError
    *  - {Number} timeout

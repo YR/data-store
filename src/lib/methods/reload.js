@@ -13,7 +13,7 @@ const load = require('./load');
  *  - {Boolean} abort
  *  - {Boolean} ignoreQuery
  *  - {Number} minExpiry
- *  - {Number} retry
+ *  - {Number} retries
  *  - {Number} timeout
  */
 module.exports = function reload (store, key, url, options) {
