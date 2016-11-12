@@ -23,7 +23,6 @@ const HANDLED_METHODS = {
   remove: [remove, ['key']],
   set: [set, ['key', 'value', 'options']]
 };
-const REFERENCE_KEY = '__ref';
 
 let uid = 0;
 
@@ -40,8 +39,6 @@ module.exports = class DataStore extends Emitter {
   constructor (id, data, options = {}) {
     super();
 
-    this.REFERENCE_KEY = REFERENCE_KEY;
-
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
@@ -51,29 +48,14 @@ module.exports = class DataStore extends Emitter {
     this._data = {};
     this._handledMethods = {};
     this._handlers = {};
-    this._references = {};
     this._serialisableKeys = options.serialisableKeys || {};
 
     for (const methodName in HANDLED_METHODS) {
-      this.registerHandledMethod(methodName, ...HANDLED_METHODS[methodName]);
+      this._registerHandledMethod(methodName, ...HANDLED_METHODS[methodName]);
     }
     if (options.handlers) this.registerMethodHandlers(options.handlers);
 
     this.reset(data || {});
-  }
-
-  /**
-   * Register handled method with 'methodName'
-   * @param {String} methodName
-   * @param {Function} fn
-   * @param {Array} signature
-   */
-  registerHandledMethod (methodName, fn, signature) {
-    if (this._handledMethods[methodName]) return;
-
-    if (!this._handlers[methodName]) this._handlers[methodName] = [];
-    // Partially apply arguments for routing
-    this._handledMethods[methodName] = this._routeHandledMethod.bind(this, fn.bind(this, this), signature, this._handlers[methodName]);
   }
 
   /**
@@ -135,7 +117,7 @@ module.exports = class DataStore extends Emitter {
    * Store 'value' at 'key', notifying listeners of change
    * Allows passing of arbitrary additional args to listeners
    * Hash of 'key:value' pairs batches changes
-   * @param {String} key
+   * @param {String|Object} key
    * @param {Object} value
    * @param {Object} [options]
    *  - {Boolean} merge
@@ -198,13 +180,13 @@ module.exports = class DataStore extends Emitter {
    * @param {String|Object} key
    * @param {Boolean} value
    */
-  setSerialisableKey (key, value) {
+  setSerialisabilityOfKey (key, value) {
     if (key.charAt(0) == '/') key = key.slice(1);
 
     // Handle batch
     if (isPlainObject(key)) {
       for (const k in key) {
-        this.setSerialisableKey(k, value);
+        this.setSerialisabilityOfKey(k, value);
       }
       return;
     }
@@ -245,35 +227,6 @@ module.exports = class DataStore extends Emitter {
     return serialise(null, this._data, this._serialisableKeys);
   }
 
-  _createReference (key, value) {
-    if (!isPlainObject(value)) return;
-
-    const rootKey = this._getRootKey(key);
-
-    value[REFERENCE_KEY] = rootKey;
-    this._references[rootKey] = [];
-  }
-
-  _updateReference (key, value) {
-    if (!isPlainObject(value) || !value[REFERENCE_KEY]) return;
-
-    const rootKey = this._getRootKey(key);
-    const refKey = value[REFERENCE_KEY];
-
-    if (refKey != rootKey) {
-      // Unreference
-      if (this._references[rootKey]) {
-
-      }
-      this._references[rootKey] = refKey;
-
-    }
-  }
-
-  _isReferenceKey (key) {
-
-  }
-
   /**
    * Determine if 'key' matches 'match'
    * @param {String} key
@@ -285,6 +238,22 @@ module.exports = class DataStore extends Emitter {
     if (!match) return true;
     if (match instanceof RegExp) return match.test(key);
     return false;
+  }
+
+  /**
+   * Register handled method with 'methodName'
+   * @param {String} methodName
+   * @param {Function} fn
+   * @param {Array} signature
+   */
+  _registerHandledMethod (methodName, fn, signature) {
+    if (this._handledMethods[methodName]) return;
+
+    if (!this._handlers[methodName]) this._handlers[methodName] = [];
+    // Partially apply arguments for routing
+    this._handledMethods[methodName] = this._routeHandledMethod.bind(this, fn.bind(this, this), signature, this._handlers[methodName]);
+    // Expose method if it doesn't exist
+    if (!this[methodName]) this[methodName] = this._handledMethods[methodName];
   }
 
   /**
@@ -390,7 +359,6 @@ function destroy (store) {
   store._cursors = {};
   store._data = {};
   store._handlers = {};
-  store._references = {};
   store._serialisableKeys = {};
   store.removeAllListeners();
 }
