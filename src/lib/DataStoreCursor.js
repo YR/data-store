@@ -2,17 +2,7 @@
 
 const keys = require('@yr/keys');
 
-/**
- * Instance factory
- * @param {String} key
- * @param {DataStore} dataStore
- * @returns {DataStoreCursor}
- */
-exports.create = function create (key, dataStore) {
-  return new DataStoreCursor(key, dataStore);
-};
-
-class DataStoreCursor {
+module.exports = class DataStoreCursor {
   /**
    * Constructor
    * @param {String} key
@@ -24,14 +14,16 @@ class DataStoreCursor {
   }
 
   /**
-   * Retrieve prop value with `key`
-   * @param {String} [key]
-   * @returns {Object}
+   * Retrieve value stored at 'key'
+   * Empty 'key' returns all data
+   * Array of keys returns array of values
+   * @param {String|Array} [key]
+   * @returns {*}
    */
   get (key) {
     const fixKey = (key) => {
       // Prefix with cursor key if not root
-      return (!this.dataStore.isRootKey(key))
+      return (!this._isRootKey(key))
         ? keys.join(this.key, key)
         : key;
     };
@@ -47,12 +39,15 @@ class DataStoreCursor {
   }
 
   /**
-   * Store prop 'key' with 'value', notifying listeners of change
-   * @param {String} key
+   * Store 'value' at 'key', notifying listeners of change
+   * Allows passing of arbitrary additional args to listeners
+   * Hash of 'key:value' pairs batches changes
+   * @param {String|Object} key
    * @param {Object} value
    * @param {Object} [options]
+   *  - {Boolean} merge
    */
-  update (key, value, options) {
+  update (key, value, options, ...args) {
     // Handle empty key (set value at cursor root)
     if (!key) key = this.key;
 
@@ -61,14 +56,14 @@ class DataStoreCursor {
 
     // Fix keys (prefix with cursor key if not root)
     for (const k in key) {
-      if (!this.dataStore.isRootKey(k)) {
+      if (!this._isRootKey(k)) {
         key[keys.join(this.key, k)] = key[k];
         delete key[k];
       }
     }
 
     // Batch update
-    this.dataStore.update(key, options);
+    this.dataStore.update(key, null, options, ...args);
   }
 
   /**
@@ -77,7 +72,7 @@ class DataStoreCursor {
    * @returns {DataStoreCursor}
    */
   createCursor (key) {
-    return new DataStoreCursor(keys.join(this.key, key), this.dataStore);
+    return this.dataStore.createCursor(keys.join(this.key, key));
   }
 
   /**
@@ -86,4 +81,13 @@ class DataStoreCursor {
   destroy () {
     this.dataStore = null;
   }
-}
+
+  /**
+   * Determine if 'key' is global
+   * @param {String} key
+   * @returns {Boolean}
+   */
+  _isRootKey (key) {
+    return key ? (key.charAt(0) == '/') : false;
+  }
+};
