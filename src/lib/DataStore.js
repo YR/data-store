@@ -11,6 +11,7 @@ const Cursor = require('./DataStoreCursor');
 const Debug = require('debug');
 const Emitter = require('eventemitter3');
 const get = require('./methods/get');
+const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
 const remove = require('./methods/remove');
 const set = require('./methods/set');
@@ -273,68 +274,23 @@ module.exports = class DataStore extends Emitter {
     // Defer to handlers
     if (handlers && handlers.length) {
       const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this._isMatchKey(key, match));
-      let context = getHandlerContext(signature, args);
+      const context = new HandlerContext(this, signature, args);
+      let returnValue;
 
       for (let i = 0, n = matchingHandlers.length; i < n; i++) {
-        const returnValue = matchingHandlers[i].handler(this, context);
+        returnValue = matchingHandlers[i].handler(context);
 
-        // Abort on first return value
+        // Exit on first return value
         if (returnValue !== undefined) return returnValue;
-        if (i == n - 1) {
-          return fn(...applyHandlerContext(signature, context));
-        }
       }
+      returnValue = fn(...context.toArguments());
+      context.destroy();
+      return returnValue;
     }
 
     return fn(key, ...rest);
   }
 };
-
-/**
- * Retrieve context object for 'signature' and 'args'
- * @param {Array} signature
- * @param {Array} args
- * @returns {Object}
- */
-function getHandlerContext (signature, args) {
-  let context = {};
-
-  for (let i = 0, n = signature.length; i < n; i++) {
-    const prop = signature[i];
-
-    if (prop.indexOf('...') == 0) {
-      prop = prop.slice(3);
-      context[prop] = args.slice(i);
-    } else {
-      context[prop] = args[i];
-    }
-  }
-
-  return context;
-}
-
-/**
- * Convert 'context' for 'signature' to array of args
- * @param {Array} signature
- * @param {Object} context
- * @returns {Array}
- */
-function applyHandlerContext (signature, context) {
-  let args = [];
-
-  for (let i = 0, n = signature.length; i < n; i++) {
-    const prop = signature[i];
-
-    if (prop.indexOf('...') == 0) {
-      prop = prop.slice(3);
-      args.push(...context[prop]);
-    } else {
-      args.push(context[prop]);
-    }
-  }
-
-  return args;
-}
 
 /**
  * Reset underlying 'data'

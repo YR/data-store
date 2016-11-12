@@ -28,6 +28,7 @@ module.exports = class FetchableDataStore extends DataStore {
     this.EXPIRES_KEY = EXPIRES_KEY;
 
     this._registerHandledMethod('fetch', fetch, ['key', 'url', 'options']);
+    this.registerMethodHandler('destroy', null, abort);
   }
 
   /**
@@ -59,9 +60,8 @@ module.exports = class FetchableDataStore extends DataStore {
 /**
  * Abort all outstanding load/reload requests
  */
-/*abort () {
+function abort () {
   // TODO: return aborted urls and use in clock.cancel
-  agent.abortAll(this.uid);
-  // clock.cancelAll(this.id);
+  // agent.abortAll(url);
+  // clock.cancelAll(url);
 }
-*/

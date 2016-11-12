@@ -5,6 +5,7 @@ const agent = require('@yr/agent');
 const expect = require('expect.js');
 const fetch = require('../src/lib/methods/fetch');
 const get = require('../src/lib/methods/get');
+const HandlerContext = require('../src/lib/HandlerContext');
 const load = require('../src/lib/methods/load');
 const nock = require('nock');
 const reload = require('../src/lib/methods/reload');
@@ -408,7 +409,7 @@ describe('DataStore', function () {
         it('should allow handling', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', null, function (store, context) {
+          store.registerMethodHandler('get', null, function (context) {
             run++;
           });
           expect(store.get('bar')).to.equal('bat');
@@ -417,7 +418,7 @@ describe('DataStore', function () {
         it('should allow matched handling', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (store, context) {
+          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (context) {
             run++;
             expect(context.key).to.equal('foo/bar');
           });
@@ -427,9 +428,9 @@ describe('DataStore', function () {
         it('should allow delegation for computed values', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (store, context) {
+          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (context) {
             run++;
-            return `${store.get('bar')} ${store.get('boo')}`;
+            return `${context.store.get('bar')} ${context.store.get('boo')}`;
           });
           expect(store.get('foo/bar')).to.equal('bat foo');
           expect(run).to.equal(1);
@@ -437,10 +438,10 @@ describe('DataStore', function () {
         it('should allow multiple delegates', function () {
           let run = 0;
 
-          store.registerMethodHandler('get', /foo/, function (store, context) {
+          store.registerMethodHandler('get', /foo/, function (context) {
             run++;
           });
-          store.registerMethodHandler('get', /foo/, function (store, context) {
+          store.registerMethodHandler('get', /foo/, function (context) {
             run++;
           });
           expect(store.get('foo/bar')).to.equal('boo');
@@ -452,7 +453,7 @@ describe('DataStore', function () {
         it('should allow delegation', function () {
           let run = 0;
 
-          store.registerMethodHandler('set', /zing/, function (store, context) {
+          store.registerMethodHandler('set', /zing/, function (context) {
             run++;
             context.value = 'bar';
             expect(context.key).to.equal('zing');
@@ -461,20 +462,42 @@ describe('DataStore', function () {
           expect(store._data.zing).to.equal('bar');
           expect(run).to.equal(1);
         });
-        it('should allow multiple delegates', function () {
+        it('should allow handling with option merging', function () {
           let run = 0;
 
-          store.registerMethodHandler('set', /zing/, function (store, context) {
+          store.registerMethodHandler('set', /foo/, function (context) {
+            run++;
+            context.mergeOptions({ merge: false });
+            expect(context.key).to.equal('foo');
+          });
+          store.set('foo', { bar: 'bar' });
+          expect(store._data.foo).to.eql({ bar: 'bar' });
+          expect(run).to.equal(1);
+        });
+        it('should allow multiple handlers', function () {
+          let run = 0;
+
+          store.registerMethodHandler('set', /zing/, function (context) {
             run++;
             context.value = 'bar';
           });
-          store.registerMethodHandler('set', /zing/, function (store, context) {
+          store.registerMethodHandler('set', /zing/, function (context) {
             run++;
-            context.key = {
-              [context.key]: context.value,
-              zang: 'bar'
-            };
-            context.value = null;
+          });
+          store.set('zing', 'foo');
+          expect(store._data.zing).to.equal('bar');
+          expect(run).to.equal(2);
+        });
+        it('should allow multiple handlers with key batching', function () {
+          let run = 0;
+
+          store.registerMethodHandler('set', /zing/, function (context) {
+            run++;
+            context.value = 'bar';
+          });
+          store.registerMethodHandler('set', /zing/, function (context) {
+            run++;
+            context.batchKey('zang', 'bar');
           });
           store.set('zing', 'foo');
           expect(store._data.zing).to.equal('bar');
@@ -714,6 +737,82 @@ describe('FetchableDataStore', function () {
         .catch((err) => {
           done(err);
         });
+    });
+  });
+});
+
+describe('HandlerContext', function () {
+  describe('constructor', function () {
+    it('should assign passed args based on signature', function () {
+      const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
+
+      expect(context.key).to.equal('foo');
+      expect(context.value).to.equal('bar');
+    });
+    it('should assign passed args, including rest argument', function () {
+      const context = new HandlerContext({}, ['key', 'value', '...args'], ['foo', 'bar', true]);
+
+      expect(context.key).to.equal('foo');
+      expect(context.value).to.equal('bar');
+      expect(context.args).to.eql([true]);
+    });
+  });
+
+  describe('batchKey', function () {
+    it('should batch key/value with simple key/value', function () {
+      const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
+
+      context.batchKey('boo', true);
+      expect(context.key).to.eql({ foo: 'bar', boo: true });
+      expect(context.value).to.eql(null);
+    });
+    it('should batch key/value with batched key/value', function () {
+      const context = new HandlerContext({}, ['key', 'value'], [{ foo: 'bar' }]);
+
+      context.batchKey('boo', true);
+      expect(context.key).to.eql({ foo: 'bar', boo: true });
+      expect(context.value).to.eql(undefined);
+
+    });
+    it('should batch key with simple key', function () {
+      const context = new HandlerContext({}, ['key'], ['foo']);
+
+      context.batchKey('boo');
+      expect(context.key).to.eql(['foo', 'boo']);
+    });
+    it('should batch key with batched key', function () {
+      const context = new HandlerContext({}, ['key'], [['foo']]);
+
+      context.batchKey('boo');
+      expect(context.key).to.eql(['foo', 'boo']);
+    });
+  });
+
+  describe('mergeOptions', function () {
+    it('should define missing options', function () {
+      const context = new HandlerContext({}, ['key', 'value', 'options'], ['foo', 'bar']);
+
+      context.mergeOptions({ merge: false });
+      expect(context.options).to.eql({ merge: false });
+    });
+    it('should merge existing options', function () {
+      const context = new HandlerContext({}, ['key', 'value', 'options'], ['foo', 'bar', { foo: true }]);
+
+      context.mergeOptions({ merge: false });
+      expect(context.options).to.eql({ foo: true, merge: false });
+    });
+  });
+
+  describe('toArguments', function () {
+    it('should return args based on signature', function () {
+      const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
+
+      expect(context.toArguments()).to.eql(['foo', 'bar']);
+    });
+    it('should return args, including rest argument', function () {
+      const context = new HandlerContext({}, ['key', 'value', '...args'], ['foo', 'bar', true]);
+
+      expect(context.toArguments()).to.eql(['foo', 'bar', true]);
     });
   });
 });
