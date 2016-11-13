@@ -57,8 +57,7 @@ module.exports = class FetchableDataStore extends DataStore {
 
     if ('string' == typeof key) {
       if (!this._fetchedKeys[key]) this._fetchedKeys[key] = true;
-      this._handledMethods.fetch(key, url, options);
-      return;
+      return this._handledMethods.fetch(key, url, options);
     }
 
     if (isPlainObject(key)) {
