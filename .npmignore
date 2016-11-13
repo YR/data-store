@@ -3,3 +3,4 @@
 test
 docs
 yarn.lock
+.travis.yml

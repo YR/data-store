@@ -135,8 +135,8 @@ Abort outstanding `load`/`reload` operations. If `key` is omitted, all operation
 ```js
 store
   .fetch('beep', 'http://localhost/beep')
-  .then((result) => {
-    console.log(result.error); //=> 'request aborted'
+  .catch((err) => {
+    console.log(err.error); //=> 'request aborted'
   });
 store.abort('beep');
 ```

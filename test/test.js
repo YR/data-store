@@ -605,16 +605,16 @@ describe('FetchableDataStore', function () {
 
     it('should return a Promise with the value', function () {
       return fetch(store, 'bar', null, {})
-        .then((value) => {
-          expect(value.data).to.equal('bat');
+        .then((result) => {
+          expect(result.data).to.equal('bat');
         });
     });
     it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
       set(store, 'foo/__expires', 0);
 
       return fetch(store, 'foo', 'http://localhost/foo', { staleWhileRevalidate: true })
-        .then((value) => {
-          expect(value.data).to.not.have.property('foo');
+        .then((result) => {
+          expect(result.data).to.not.have.property('foo');
         });
     });
     it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', function () {
@@ -624,8 +624,8 @@ describe('FetchableDataStore', function () {
       set(store, 'foo/__expires', 0);
 
       return fetch(store, 'foo', 'http://localhost/foo', { staleWhileRevalidate: false })
-        .then((value) => {
-          expect(value.data).to.have.property('foo', 'foo');
+        .then((result) => {
+          expect(result.data).to.have.property('foo', 'foo');
         });
     });
     it('should return a Promise for an array of keys when batch fetching', function () {
@@ -637,9 +637,9 @@ describe('FetchableDataStore', function () {
       set(store, { 'foo/__expires': 0, 'bar/__expires': 0 });
 
       return fetch(store, { foo: 'http://localhost/foo', bar: 'http://localhost/bar' }, { staleWhileRevalidate: false })
-        .then((values) => {
-          expect(values[0].data).to.have.property('foo', 'foo');
-          expect(values[1].data).to.have.property('bar', 'bar');
+        .then((results) => {
+          expect(results[0].data).to.have.property('foo', 'foo');
+          expect(results[1].data).to.have.property('bar', 'bar');
         });
     });
     it('should return a Promise when failure loading', function () {
@@ -648,9 +648,9 @@ describe('FetchableDataStore', function () {
         .reply(500);
 
       return fetch(store, 'beep', 'http://localhost/beep', { retries: 0, timeout: 10 })
-        .then((value) => {
-          expect(value.data).to.equal(null);
-          expect(value.headers.status).to.equal(500);
+        .catch((err) => {
+          expect(err.data).to.equal(undefined);
+          expect(err.status).to.equal(500);
         });
     });
     it('should return a Promise when loading aborted', function (done) {
@@ -660,12 +660,10 @@ describe('FetchableDataStore', function () {
         .reply(200, { beep: 'beep' });
 
       fetch(store, 'beep', 'http://localhost/beep', { retries: 0, timeout: 10 })
-        .then((value) => {
-          expect(value.data).to.equal(null);
-          expect(value.headers.status).to.equal(499);
+        .catch((err) => {
+          expect(err.data).to.equal(undefined);
+          expect(err.status).to.equal(499);
           done();
-        }).catch((err) => {
-          done(err);
         });
       agent.abortAll();
     });
@@ -677,7 +675,7 @@ describe('FetchableDataStore', function () {
         .reply(200, { beep: 'bar' });
 
       fetch(store, 'beep', 'http://localhost/beep', { reload: true, retries: 0, timeout: 10, minExpiry: 75 })
-        .then((value) => {
+        .then((result) => {
           expect(get(store, 'beep')).to.have.property('beep', 'foo');
           setTimeout(() => {
             expect(get(store, 'beep')).to.have.property('beep', 'bar');
@@ -696,15 +694,12 @@ describe('FetchableDataStore', function () {
         .reply(200, { beep: 'bar' });
 
       fetch(store, 'beep', 'http://localhost/beep', { reload: true, retries: 0, timeout: 10, minExpiry: 75 })
-        .then((value) => {
-          expect(value.data).to.equal(null);
+        .catch((err) => {
+          expect(err.status).to.equal(500);
           setTimeout(() => {
             expect(get(store, 'beep')).to.have.property('beep', 'bar');
             done();
           }, 100);
-        })
-        .catch((err) => {
-          done(err);
         });
     });
     it.skip('should cancel existing reload of "key" when loading new "key"', function (done) {
@@ -717,11 +712,11 @@ describe('FetchableDataStore', function () {
         .reply(200, { bar: 'bar' }, { expires: 0 });
 
       fetch(store, 'beep', 'http://localhost/beep', { merge: false, reload: true })
-        .then((value) => {
+        .then((result) => {
           expect(get(store, 'beep')).to.have.property('foo', 'foo');
           setTimeout(() => {
             fetch(store, 'bop', 'http://localhost/bop', { merge: false, reload: true })
-              .then((value) => {
+              .then((result) => {
                 expect(get(store, 'beep')).to.have.property('foo', 'foo');
                 expect(get(store, 'bop')).to.have.property('bar', 'bar');
                 setTimeout(() => {

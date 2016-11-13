@@ -70,18 +70,19 @@ function doFetch (store, key, url, options) {
         .catch((err) => {
           // Schedule a reload if error
           if (err.status >= 500 && shouldReload) reload(store, key, url, options);
-          // TODO: reject if not staleIfError?
+          if (!staleIfError) return reject(err);
           resolve({
             duration: 0,
             error: err,
             headers: { status: err.status },
-            data: staleIfError ? value : null
+            data: value
           });
         });
     });
 
-    // Wait for load unless stale and staleWhileRevalidate
-    if (!(value && staleWhileRevalidate)) return promiseToLoad;
+    if (!staleWhileRevalidate) return promiseToLoad;
+    // Prevent unhandled
+    promiseToLoad.catch((err) => { /* promise never returned, so swallow error */ });
   }
 
   // Schedule a reload
