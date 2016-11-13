@@ -18,7 +18,6 @@ const set = require('./methods/set');
 const update = require('./methods/update');
 
 const HANDLED_METHODS = {
-  destroy: [destroy, []],
   get: [get, ['key']],
   reset: [reset, ['data']],
   remove: [remove, ['key']],
@@ -152,7 +151,16 @@ module.exports = class DataStore extends Emitter {
    * Destroy instance
    */
   destroy () {
-    this._handledMethods.destroy();
+    // Destroy cursors
+    for (const key in this._cursors) {
+      this._cursors[key].destroy();
+    }
+    this.destroyed = true;
+    this._cursors = {};
+    this._data = {};
+    this._handlers = {};
+    this._serialisableKeys = {};
+    this.removeAllListeners();
   }
 
   /**
@@ -300,23 +308,6 @@ module.exports = class DataStore extends Emitter {
 function reset (store, data) {
   store.debug('reset');
   store._data = data;
-}
-
-/**
- * Destroy instance
- * @param {DataStore} store
- */
-function destroy (store) {
-  // Destroy cursors
-  for (const key in store._cursors) {
-    store._cursors[key].destroy();
-  }
-  store.destroyed = true;
-  store._cursors = {};
-  store._data = {};
-  store._handlers = {};
-  store._serialisableKeys = {};
-  store.removeAllListeners();
 }
 
 /**
