@@ -103,7 +103,7 @@ Retrieve all data as `Object` or `String` (if `stringify` argument is `true`).
 ### `FetchableDataStore`
 
 #### `fetch (key: String|Object, url: String, options: Object): Promise`
-Retrieve value stored at `key`. If `key` is a hash of `key:url` pairs, batch fetch those values, returning a Promise resolving to an array of results. If the stored value has not yet been set, or is set but expired (based on `expires` header), will load from `url`:
+Retrieve value stored at `key`. If `key` is a hash of `key:url` pairs, batch fetch those values, returning a Promise resolving to an array of results. If the stored value has not yet been set, or is set but expired (based on `expires` header), load from `url`:
 
 ```js
 store
@@ -142,7 +142,7 @@ store.abort('beep');
 ```
 
 ### `DataStoreCursor`
-Cursors are lightweight objects that scope `read`/`update` operations, limiting the necessity to have full knowledge of deeply nested data structures:
+Cursors are lightweight objects that scope `read`/`update` operations, limiting the need to have full knowledge of deeply nested data structures:
 
 ```js
 const cursor = store.createCursor('foo/bar');
@@ -179,7 +179,7 @@ console.log(childCursor.get('0') === store.get('foo/bar/boo/0')); //=> true
 
 ## Handlers
 
-In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a method and key with a handler function. In practive, this enables observation, delegation, and side effects for the following methods: 
+In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a method and key (url path) with a handler function. In practive, this enables observation, delegation, middleware, and side effects for the following methods: 
 
 **`DataStore`**
 - `get`
@@ -190,7 +190,9 @@ In principle, the handlers API is similar to route matching in server frameworks
 **`FetchableDataStore`**
 - `fetch`
 
-Handlers are registered with `DataStore.registerMethodHandler(methodName: String|Array, match: RegExp, handler: Function)`, and will route an operation (`methodName`), matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in series, and may optionally respond directly with a value (delegation), batch additional changes (observation), or trigger further operations (side effects).
+Handlers are registered with `DataStore.registerMethodHandler(methodName: String|Array, match: RegExp, handler: Function)`, and will route an operation (`methodName`), matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in series, and may optionally respond directly with a value (delegation), batch additional changes (observation), or trigger unrelated operations (side effects).
+
+Matching is based on the `methodName` and a regular expression (`match`). If no `match` is specified (is `null` or `undefined`), or if the method does not accept a `key` (as is the case for `reset`), handlers are automatically matched and executed.
 
 ### `HandlerContext`
 
@@ -223,13 +225,3 @@ store.registerMethodHandler('set', /foo/, function (context) {
 store.set('foo/bat', 'bat');
 store.get('foo'); //=> { bat: 'bat' }
 ```
-
-### Patterns
-
-##### Delegation
-
-##### Observation
-
-##### Computed values
-
-##### Side Effects
