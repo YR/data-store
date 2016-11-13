@@ -1,9 +1,12 @@
 'use strict';
 
+const agent = require('@yr/agent');
 const assign = require('object-assign');
+const clock = require('@yr/clock');
 const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
 const isPlainObject = require('is-plain-obj');
+const runtime = require('@yr/runtime');
 
 const DEFAULT_LOAD_OPTIONS = {
   minExpiry: 60000,
@@ -26,9 +29,9 @@ module.exports = class FetchableDataStore extends DataStore {
     super(id, data, options);
 
     this.EXPIRES_KEY = EXPIRES_KEY;
+    this._fetchedKeys = {};
 
     this._registerHandledMethod('fetch', fetch, ['key', 'url', 'options']);
-    this.registerMethodHandler('destroy', null, abort);
   }
 
   /**
@@ -49,19 +52,54 @@ module.exports = class FetchableDataStore extends DataStore {
    */
   fetch (key, url, options) {
     if (!key) return;
+
     options = assign({}, DEFAULT_LOAD_OPTIONS, options);
-    if ('string' == typeof key) return this._handledMethods.fetch(key, url, options);
+
+    if ('string' == typeof key) {
+      if (!this._fetchedKeys[key]) this._fetchedKeys[key] = true;
+      this._handledMethods.fetch(key, url, options);
+      return;
+    }
+
     if (isPlainObject(key)) {
-      return Promise.all(Object.keys(key).map((k) => this._handledMethods.fetch(k, key[k], options)));
+      return Promise.all(Object.keys(key)
+        .map((k) => {
+          if (!this._fetchedKeys[k]) this._fetchedKeys[k] = true;
+          return this._handledMethods.fetch(k, key[k], options);
+        })
+      );
     }
   }
-};
 
-/**
- * Abort all outstanding load/reload requests
- */
-function abort () {
-  // TODO: return aborted urls and use in clock.cancel
-  // agent.abortAll(url);
-  // clock.cancelAll(url);
-}
+  /**
+   * Abort all outstanding load/reload requests
+   * @param {String|Array} [key]
+   */
+  abort (key) {
+    // Abort all
+    if (!key) {
+      // Too dangerous to abort on server in case more than one outstanding request
+      if (runtime.isBrowser) agent.abortAll((req) => this._fetchedKeys[req.__agentId]);
+      for (const key in this._fetchedKeys) {
+        clock.cancel(key);
+      }
+      this._fetchedKeys = {};
+      return;
+    }
+
+    if ('string' == typeof key) key = [key];
+    key.forEach((k) => {
+      if (runtime.isBrowser) agent.abortAll(k);
+      clock.cancel(k);
+      delete this._fetchedKeys[k];
+    });
+  }
+
+  /**
+   * Destroy instance
+   */
+  destroy () {
+    this.abort();
+    super.destroy();
+  }
+};

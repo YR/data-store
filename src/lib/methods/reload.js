@@ -36,6 +36,5 @@ module.exports = function reload (store, key, url, options) {
         store.debug('unable to reload "%s" from %s', key, url);
         reload(store, key, url, options);
       });
-  // TODO: set id
-  }, url);
+  }, key);
 };

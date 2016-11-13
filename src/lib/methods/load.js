@@ -18,8 +18,7 @@ const GRACE = 10000;
  * @returns {Promise}
  */
 module.exports = function load (store, key, url, options) {
-  // TODO: more granular id needed
-  options.id = url;
+  options.id = key;
 
   store.debug('load %s from %s', key, url);
 
