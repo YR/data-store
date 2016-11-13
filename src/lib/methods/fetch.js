@@ -70,6 +70,7 @@ function doFetch (store, key, url, options) {
         .catch((err) => {
           // Schedule a reload if error
           if (err.status >= 500 && shouldReload) reload(store, key, url, options);
+          // TODO: reject if not staleIfError?
           resolve({
             duration: 0,
             error: err,

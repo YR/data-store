@@ -19,34 +19,18 @@ store.get('foo/bar/bat'); //=> true
 #### `create (id: String, data: Object, options: Object): DataStore|FetchableDataStore` 
 Instance factory. Options include:
 
-- **`handlers: Object`** handler definitions, keyed by method name [default: `{}`]. See [handlers](#handlers)
+- **`handlers: Array`** array of arrays (`[methodName: String, match: RegExp, handler: Function]`) for passing to `registerMethodHandler` [default: `null`]. See [handlers](#handlers)
 - **`isFetchable: Boolean`** specify whether instance should be a `FetchableDataStore` that supports data fetching [default: `false`]. See [FetchableDataStore](#fetchabledatastore)
 - **`isWritable: Boolean`** specify whether instance should be writable via `set()/update()` [default: `true`]
 - **`serialisableKeys: Object`** object listing keys and their serialisable state [default: `{}`]. See [`setSerialisabilityOfKey()`](#setserialisabilityofkey-key-stringobject-value-boolean)
 
 ### `DataStore`
 
-#### `registerMethodHandlers (handlers: Object)`
-Bulk register method handlers:
+#### `registerMethodHandler (methodName: String|Array, match: RegExp, handler: Function)`
+Register a method handler for `methodName` (see [handlers](#handlers)):
 
 ```js
-store.registerMethodHandlers({
-  get: [{
-    match: /foo/,
-    handler: function (store, context) { /* */ }
-  }],
-  set: [{
-    match: /foo/,
-    handler: function (store, context) { /* */ }
-  }]
-});
-```
-
-#### `registerMethodHandler (methodName: String, match: RegExp, handler: Function)`
-Register a method handler for `methodName`:
-
-```js
-store.registerMethodHandler('get', /foo/, function (store, context) { /* */ });
+store.registerMethodHandler('get', /foo/, function (context) { /* */ });
 ```
 
 #### `get (key: String|Array): *` 
@@ -145,6 +129,18 @@ Options include:
 - **`staleIfError: Boolean`** specify whether to resolve returned promise with stale value or `null` after load error [default: `false`]
 - **`timeout: Number`** the timeout duration (in ms) before attempting retry [default: `5000`]
 
+#### `abort (key: String|Array)`
+Abort outstanding `load`/`reload` operations. If `key` is omitted, all operations will be aborted:
+
+```js
+store
+  .fetch('beep', 'http://localhost/beep')
+  .then((result) => {
+    console.log(result.error); //=> 'request aborted'
+  });
+store.abort('beep');
+```
+
 ### `DataStoreCursor`
 Cursors are lightweight objects that scope `read`/`update` operations, limiting the necessity to have full knowledge of deeply nested data structures:
 
@@ -183,3 +179,57 @@ console.log(childCursor.get('0') === store.get('foo/bar/boo/0')); //=> true
 
 ## Handlers
 
+In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a method and key with a handler function. In practive, this enables observation, delegation, and side effects for the following methods: 
+
+**`DataStore`**
+- `get`
+- `set`
+- `remove`
+- `reset`
+
+**`FetchableDataStore`**
+- `fetch`
+
+Handlers are registered with `DataStore.registerMethodHandler(methodName: String|Array, match: RegExp, handler: Function)`, and will route an operation (`methodName`), matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in series, and may optionally respond directly with a value (delegation), batch additional changes (observation), or trigger further operations (side effects).
+
+### `HandlerContext`
+
+Handler functions are passed a `HandlerContext` instance with the following properties:
+- **`store: DataStrore`** reference to current `DataStore` instance
+- **`signature: Array`** method arguments for handled method
+- **`key, value, options, etc`** argument values passed to handled method
+
+```js
+store.registerMethodHandler('get', /foo/, function (context) {
+  console.log(context.key); //=> 'foo/bar'
+});
+store.get('foo/bar');
+```
+
+In addition, the following helper methods are available:
+- **`batch(key: String|Object|Array, value: *)`** batch additional changes:
+```js
+store.registerMethodHandler('set', /boo/, function (context) {
+  context.batch('boo/bat', 'bat');
+});
+store.set('boo/bar', 'bar');
+store.get('boo'); //=> { bar: 'bar', bat: 'bat' }
+```
+- **`merge(propName: String, prop: Object)`** merge `prop` with `context[propName]`:
+```js
+store.registerMethodHandler('set', /foo/, function (context) {
+  context.merge('options', { merge: false })
+});
+store.set('foo/bat', 'bat');
+store.get('foo'); //=> { bat: 'bat' }
+```
+
+### Patterns
+
+##### Delegation
+
+##### Observation
+
+##### Computed values
+
+##### Side Effects
