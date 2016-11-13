@@ -1,6 +1,7 @@
 'use strict';
 
 const assign = require('object-assign');
+const isPlainObject = require('is-plain-obj');
 
 module.exports = class HandlerContext {
   /**
@@ -31,18 +32,19 @@ module.exports = class HandlerContext {
    * @param {String|Object} key
    * @param {*} [value]
    */
-  batchKey (key, value) {
+  batch (key, value) {
     if (!this.key) this.key = '';
 
     const asArray = (value === undefined);
     const isString = ('string' == typeof key);
+    const valueName = this.signature[1];
 
     // Convert existing to hash/array
     if ('string' == typeof this.key) {
       this.key = asArray
         ? [this.key]
-        : { [this.key]: this.value };
-      if ('value' in this) this.value = null;
+        : { [this.key]: this[valueName] };
+      if (valueName in this) this[valueName] = null;
     }
 
     if (asArray) {
@@ -62,11 +64,13 @@ module.exports = class HandlerContext {
   }
 
   /**
-   * Merge 'options' with existing
-   * @param {Object} options
+   * Merge 'prop' with existing
+   * @param {String} propName
+   * @param {Object} prop
    */
-  mergeOptions (options) {
-    this.options = assign({}, options, this.options);
+  merge (propName, prop) {
+    if (!isPlainObject(prop)) return;
+    this[propName] = assign({}, prop, this[propName]);
   }
 
   /**

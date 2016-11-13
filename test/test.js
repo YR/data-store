@@ -467,7 +467,7 @@ describe('DataStore', function () {
 
           store.registerMethodHandler('set', /foo/, function (context) {
             run++;
-            context.mergeOptions({ merge: false });
+            context.merge('options', { merge: false });
             expect(context.key).to.equal('foo');
           });
           store.set('foo', { bar: 'bar' });
@@ -497,7 +497,7 @@ describe('DataStore', function () {
           });
           store.registerMethodHandler('set', /zing/, function (context) {
             run++;
-            context.batchKey('zang', 'bar');
+            context.batch('zang', 'bar');
           });
           store.set('zing', 'foo');
           expect(store._data.zing).to.equal('bar');
@@ -758,18 +758,18 @@ describe('HandlerContext', function () {
     });
   });
 
-  describe('batchKey', function () {
+  describe('batch', function () {
     it('should batch key/value with simple key/value', function () {
       const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
 
-      context.batchKey('boo', true);
+      context.batch('boo', true);
       expect(context.key).to.eql({ foo: 'bar', boo: true });
       expect(context.value).to.eql(null);
     });
     it('should batch key/value with batched key/value', function () {
       const context = new HandlerContext({}, ['key', 'value'], [{ foo: 'bar' }]);
 
-      context.batchKey('boo', true);
+      context.batch('boo', true);
       expect(context.key).to.eql({ foo: 'bar', boo: true });
       expect(context.value).to.eql(undefined);
 
@@ -777,28 +777,28 @@ describe('HandlerContext', function () {
     it('should batch key with simple key', function () {
       const context = new HandlerContext({}, ['key'], ['foo']);
 
-      context.batchKey('boo');
+      context.batch('boo');
       expect(context.key).to.eql(['foo', 'boo']);
     });
     it('should batch key with batched key', function () {
       const context = new HandlerContext({}, ['key'], [['foo']]);
 
-      context.batchKey('boo');
+      context.batch('boo');
       expect(context.key).to.eql(['foo', 'boo']);
     });
   });
 
-  describe('mergeOptions', function () {
+  describe('merge', function () {
     it('should define missing options', function () {
       const context = new HandlerContext({}, ['key', 'value', 'options'], ['foo', 'bar']);
 
-      context.mergeOptions({ merge: false });
+      context.merge('options', { merge: false });
       expect(context.options).to.eql({ merge: false });
     });
     it('should merge existing options', function () {
       const context = new HandlerContext({}, ['key', 'value', 'options'], ['foo', 'bar', { foo: true }]);
 
-      context.mergeOptions({ merge: false });
+      context.merge('options', { merge: false });
       expect(context.options).to.eql({ foo: true, merge: false });
     });
   });
