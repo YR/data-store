@@ -53,30 +53,26 @@ module.exports = class DataStore extends Emitter {
     for (const methodName in HANDLED_METHODS) {
       this._registerHandledMethod(methodName, ...HANDLED_METHODS[methodName]);
     }
-    if (options.handlers) this.registerMethodHandlers(options.handlers);
+    if (options.handlers) this.registerMethodHandler(options.handlers);
 
     this.reset(data || {});
   }
 
   /**
-   * Bulk register 'handlers'
-   * @param {Object} handlers
-   */
-  registerMethodHandlers (handlers) {
-    for (const methodName in handlers) {
-      handlers[methodName].forEach(({ handler, match }) => {
-        this.registerMethodHandler(methodName, match, handler);
-      });
-    }
-  }
-
-  /**
    * Register 'handler' for 'methodName' with 'match'
-   * @param {String} methodName
+   * @param {String|Array} methodName
    * @param {RegExp} match
    * @param {Function} handler
+   * @returns {null}
    */
   registerMethodHandler (methodName, match, handler) {
+    // Handle bulk
+    if (Array.isArray(methodName)) {
+      return methodName.forEach((item) => {
+        this.registerMethodHandler(...item);
+      });
+    }
+
     if (!this._handlers[methodName]) throw Error(`${methodName} is not a recognised method for handling`);
     this._handlers[methodName].push({ handler, match });
   }
