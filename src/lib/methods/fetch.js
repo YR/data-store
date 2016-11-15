@@ -80,7 +80,7 @@ function doFetch (store, key, url, options) {
         });
     });
 
-    if (!staleWhileRevalidate) return promiseToLoad;
+    if (!(value && staleWhileRevalidate)) return promiseToLoad;
     // Prevent unhandled
     promiseToLoad.catch((err) => { /* promise never returned, so swallow error */ });
   }
