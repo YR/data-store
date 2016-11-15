@@ -45,8 +45,15 @@ function doUpdate (store, key, value, options, ...args) {
   const oldValue = get(store, key);
   // TODO: bail if no oldValue?
 
-  // Enable handling
-  store.set(key, value, options);
+  // Remove if setting to 'null'
+  // Normally would want to enforce direct use of 'remove()',
+  // but cursors only have access to 'update()', so handle it here.
+  // Call via store to enable handling
+  if (value == null) {
+    store.remove(key);
+  } else {
+    store.set(key, value, options);
+  }
 
   // Delay to prevent potential race conditions
   clock.immediate(() => {

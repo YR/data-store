@@ -195,6 +195,10 @@ describe('DataStore', function () {
         store.update('bar', 'bar');
         expect(store.get('bar')).to.equal('bar');
       });
+      it('should remove "key" if value is null', function () {
+        store.update('bar', null);
+        expect(store.get('bar')).to.equal(undefined);
+      });
       it('should allow batch writes', function () {
         store.update({ bar: 'bar', foo: 'bar' });
         expect(store.get('bar')).to.equal('bar');
