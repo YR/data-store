@@ -53,7 +53,7 @@ module.exports = function load (store, key, url, options) {
       store.debug('unable to load "%s" from %s', key, url);
 
       // Remove if not found or malformed (but not aborted)
-      if (err.status < 499) store.unset(key);
+      if (err.status < 499) store.remove(key);
 
       throw err;
     });
