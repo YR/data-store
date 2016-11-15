@@ -44,7 +44,7 @@ module.exports = function load (store, key, url, options) {
         value = store.set(key, data, options);
       }
 
-      store.emit('load:' + key, value);
+      store.emit(`load:${key}`, value);
       store.emit('load', key, value);
 
       return res;

@@ -27,7 +27,7 @@ module.exports = function reload (store, key, url, options) {
       .then((res) => {
         const value = get(store, key);
 
-        store.emit('reload:' + key, value);
+        store.emit(`reload:${key}`, value);
         store.emit('reload', key, value);
         reload(store, key, url, options);
       })
