@@ -217,21 +217,18 @@ module.exports = class DataStore extends Emitter {
    * @returns {Object|String}
    */
   dump (stringify) {
-    let obj = {};
-
-    for (const prop in this._data) {
-      obj[prop] = this._data[prop];
-    }
+    const data = explode(this, this._data);
 
     if (stringify) {
       try {
-        return JSON.stringify(obj);
+        // Pretty print
+        return JSON.stringify(data, null, 2);
       } catch (err) {
         return '';
       }
     }
 
-    return obj;
+    return data;
   }
 
   /**
@@ -379,20 +376,20 @@ function reset (store, data) {
 function serialise (key, data, config) {
   if (isPlainObject(data)) {
     let obj = {};
-    let keyChain;
 
     for (const prop in data) {
-      keyChain = key
+      const keyChain = key
         ? `${key}/${prop}`
         : prop;
+      const value = data[prop];
 
       if (config[keyChain] !== false) {
-        if (isPlainObject(data[prop])) {
-          obj[prop] = serialise(keyChain, data[prop], config);
-        } else if ('object' == typeof data[prop] && 'toJSON' in data[prop]) {
-          obj[prop] = data[prop].toJSON();
+        if (isPlainObject(value)) {
+          obj[prop] = serialise(keyChain, value, config);
+        } else if ('object' == typeof value && 'toJSON' in value) {
+          obj[prop] = value.toJSON();
         } else {
-          obj[prop] = data[prop];
+          obj[prop] = value;
         }
       }
     }
@@ -403,4 +400,27 @@ function serialise (key, data, config) {
   return (config[key] !== false)
     ? data
     : null;
+}
+
+/**
+ * Resolve all nested references for 'data'
+ * @param {DataStore} store
+ * @param {Object} data
+ * @returns {Object}
+ */
+function explode (store, data) {
+  if (isPlainObject(data)) {
+    let obj = {};
+
+    for (const prop in data) {
+      obj[prop] = explode(store, data[prop]);
+    }
+    return obj;
+  } else if (Array.isArray(data)) {
+    return data.map((value) => explode(store, value));
+  } else if (store._isRefValue(data)) {
+    return explode(store, store.get(store._parseRefKey(data)));
+  }
+
+  return data;
 }
