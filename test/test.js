@@ -19,12 +19,16 @@ describe('DataStore', function () {
   beforeEach(function () {
     store = createStore('store', {
       bar: 'bat',
-      boo: 'foo',
-      foo: {
-        bar: 'boo',
-        boo: {
-          bar: 'foo'
+      boo: {
+        bar: 'foo',
+        bat: {
+          foo: 'foo'
         }
+      },
+      foo: {
+        bar: 'foo',
+        boo: '__ref:boo',
+        bat: '__ref:bar'
       },
       bat: ['foo', 'bar']
     });
@@ -33,16 +37,37 @@ describe('DataStore', function () {
     store.destroy();
   });
 
+  describe('_resolveKeyRef()', function () {
+    it('should resolve key with no references', function () {
+      expect(store._resolveKeyRef('bar')).to.equal('bar');
+      expect(store._resolveKeyRef('zing/zoop')).to.equal('zing/zoop');
+    });
+    it('should resolve key with references', function () {
+      expect(store._resolveKeyRef('foo/boo')).to.equal('boo');
+    });
+    it('should resolve nested key with references', function () {
+      expect(store._resolveKeyRef('foo/boo/bat/foo')).to.equal('boo/bat/foo');
+      expect(store._resolveKeyRef('foo/boo/zing/zoop')).to.equal('boo/zing/zoop');
+    });
+  });
+
   describe('get()', function () {
     it('should return a value for a string key', function () {
       expect(get(store, 'bar')).to.equal('bat');
       expect(get(store, '/bar')).to.equal('bat');
     });
     it('should return an array of values for an array of string keys', function () {
-      expect(get(store, ['bar', 'boo'])).to.eql(['bat', 'foo']);
+      expect(get(store, ['bar', 'bat'])).to.eql(['bat', ['foo', 'bar']]);
     });
     it('should return all data if no key specified', function () {
       expect(get(store).bar).to.equal('bat');
+    });
+    it('should return a referenced value', function () {
+      expect(get(store, 'foo/boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
+      expect(get(store, 'foo/boo/bat/foo')).to.eql('foo');
+    });
+    it('should return an array of referenced values', function () {
+      expect(get(store, ['foo/boo/bar', 'foo/bat'])).to.eql(['foo', 'bat']);
     });
   });
 
@@ -65,6 +90,10 @@ describe('DataStore', function () {
       });
       expect(store._data.test).to.equal('success');
       expect(store._data.boop).to.have.property('bar', 'foo');
+    });
+    it('should update the original referenced value', function () {
+      set(store, 'foo/boo/bar', 'bar');
+      expect(store._data.boo.bar).to.equal('bar');
     });
   });
 
@@ -101,7 +130,7 @@ describe('DataStore', function () {
     it('should notify listeners of specific property', function (done) {
       store.on('update:foo/bar', (value, oldValue) => {
         expect(value).to.equal('bar');
-        expect(oldValue).to.equal('boo');
+        expect(oldValue).to.equal('foo');
         done();
       });
       update(store, 'foo/bar', 'bar');
@@ -135,7 +164,7 @@ describe('DataStore', function () {
         expect(store.get('/bar')).to.equal('bat');
       });
       it('should return an array of values for an array of string keys', function () {
-        expect(store.get(['bar', 'boo'])).to.eql(['bat', 'foo']);
+        expect(store.get(['bar', 'bat'])).to.eql(['bat', ['foo', 'bar']]);
       });
       it('should return all data if no key specified', function () {
         expect(store.get().bar).to.equal('bat');
@@ -216,7 +245,7 @@ describe('DataStore', function () {
       it('should notify listeners of specific property', function (done) {
         store.on('update:foo/bar', (value, oldValue) => {
           expect(value).to.equal('bar');
-          expect(oldValue).to.equal('boo');
+          expect(oldValue).to.equal('foo');
           done();
         });
         store.update('foo/bar', 'bar');
@@ -259,16 +288,21 @@ describe('DataStore', function () {
           const cursor = store.createCursor('foo');
 
           expect(store.get('bar')).to.equal('bat');
-          expect(cursor.get('bar')).to.equal('boo');
+          expect(cursor.get('bar')).to.equal('foo');
+        });
+        it('should generate a cursor instance with a subset of data at reference "key"', function () {
+          const cursor = store.createCursor('foo/boo');
+
+          expect(cursor.get('bar')).to.equal('foo');
+          expect(cursor.key).to.equal('/boo');
         });
         it('should allow retrieving all cursor properties when no key specified', function () {
           const cursor = store.createCursor('foo');
 
           expect(cursor.get()).to.eql({
-            bar: 'boo',
-            boo: {
-              bar: 'foo'
-            }
+            bar: 'foo',
+            boo: '__ref:boo',
+            bat: '__ref:bar'
           });
           expect(cursor.get()).to.eql(store.get('foo'));
         });
@@ -278,7 +312,7 @@ describe('DataStore', function () {
 
           expect(store.get('bar')).to.equal('bat');
           expect(cursor1.get('bar')).to.equal('bat');
-          expect(cursor2.get('bar')).to.equal('boo');
+          expect(cursor2.get('bar')).to.equal('foo');
         });
         it('should allow access to root properties', function () {
           store.set('bat', 'zip');
@@ -321,19 +355,19 @@ describe('DataStore', function () {
           const obj = {
             bar: 'bar',
             'boop/bar': [],
-            '/boo': 'bar'
+            '/bar': 'bar'
           };
 
           cursor.update(obj);
           expect(store.createCursor('foo/boo').get('bar')).to.equal('bar');
-          expect(store.get('boo')).to.equal('bar');
+          expect(store.get('bar')).to.equal('bar');
         });
         it('should notify listeners on update of a cursor', function (done) {
           const cursor = store.createCursor('foo');
 
           store.on('update', (key, value, oldValue) => {
             expect(key).to.equal('foo/bar');
-            expect(oldValue).to.equal('boo');
+            expect(oldValue).to.equal('foo');
             expect(store.get(key)).to.equal(value);
             done();
           });
@@ -426,7 +460,7 @@ describe('DataStore', function () {
             run++;
             expect(context.key).to.equal('foo/bar');
           });
-          expect(store.get('foo/bar')).to.equal('boo');
+          expect(store.get('foo/bar')).to.equal('foo');
           expect(run).to.equal(1);
         });
         it('should allow delegation for computed values', function () {
@@ -434,7 +468,7 @@ describe('DataStore', function () {
 
           store.registerMethodHandler('get', /foo\/[a-z]ar/, function (context) {
             run++;
-            return `${context.store.get('bar')} ${context.store.get('boo')}`;
+            return `${context.store.get('bar')} ${context.store.get('bat/0')}`;
           });
           expect(store.get('foo/bar')).to.equal('bat foo');
           expect(run).to.equal(1);
@@ -448,7 +482,7 @@ describe('DataStore', function () {
           store.registerMethodHandler('get', /foo/, function (context) {
             run++;
           });
-          expect(store.get('foo/bar')).to.equal('boo');
+          expect(store.get('foo/bar')).to.equal('foo');
           expect(run).to.equal(2);
         });
       });

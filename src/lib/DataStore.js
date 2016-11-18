@@ -13,16 +13,19 @@ const Emitter = require('eventemitter3');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
+const reference = require('./methods/reference');
 const remove = require('./methods/remove');
 const set = require('./methods/set');
 const update = require('./methods/update');
 
 const HANDLED_METHODS = {
   get: [get, ['key']],
+  reference: [reference, ['key']],
   reset: [reset, ['data']],
   remove: [remove, ['key']],
   set: [set, ['key', 'value', 'options']]
 };
+const RE_REF = /__ref:/;
 
 let uid = 0;
 
@@ -136,6 +139,17 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
+   * Retrieve reference to value stored at 'key'
+   * Array of keys returns array of references
+   * @param {String|Array} [key]
+   * @returns {String|Array}
+   */
+  reference (key) {
+    if (!key || 'string' == typeof key) return this._handledMethods.reference(key);
+    if (Array.isArray(key)) return key.map((k) => this._handledMethods.reference(k));
+  }
+
+  /**
    * Reset underlying 'data'
    * @param {Object} data
    */
@@ -165,7 +179,7 @@ module.exports = class DataStore extends Emitter {
    * @returns {DataStore}
    */
   createCursor (key) {
-    key = key || '';
+    key = this._resolveKeyRef(key || '');
     // Prefix all keys with separator
     if (key && key.charAt(0) != '/') key = `/${key}`;
 
@@ -243,6 +257,37 @@ module.exports = class DataStore extends Emitter {
     if (!match) return true;
     if (match instanceof RegExp) return match.test(key);
     return false;
+  }
+
+  /**
+   * Resolve 'key' to nearest __ref key
+   * @param {String} key
+   * @returns {String}
+   */
+  _resolveKeyRef (key) {
+    const segs = key.split('/');
+    const n = segs.length;
+    let data = this._data;
+    let idx = 0;
+    let ref = key;
+
+    // Walk data tree from root looking for nearest __ref
+    while (idx < n) {
+      if (data[segs[idx]] == null) break;
+      data = data[segs[idx]];
+      if ('string' == typeof data && RE_REF.test(data)) {
+        ref = data.slice(6);
+        break;
+      }
+      idx++;
+    }
+
+    // Append relative keys
+    if (ref != key && idx < n - 1) {
+      ref += `/${segs.slice(idx + 1).join('/')}`;
+    }
+
+    return ref;
   }
 
   /**

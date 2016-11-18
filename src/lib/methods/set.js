@@ -8,7 +8,6 @@ const runtime = require('@yr/runtime');
 const DEFAULT_OPTIONS = {
   // Browser immutable by default
   immutable: runtime.isBrowser,
-  serialisable: true,
   merge: true
 };
 
@@ -20,6 +19,7 @@ const DEFAULT_OPTIONS = {
  * @param {*} value
  * @param {Object} [options]
  *  - {Boolean} immutable
+ *  - {Boolean} reference
  *  - {Boolean} merge
  * @returns {null}
  */
@@ -43,9 +43,13 @@ module.exports = function set (store, key, value, options) {
  * @param {*} value
  * @param {Object} [options]
  *  - {Boolean} immutable
+ *  - {Boolean} reference
  *  - {Boolean} merge
  */
 function doSet (store, key, value, options) {
+  // Resolve back to original key if referenced
+  key = store._resolveKeyRef(key);
+
   if (options.immutable) {
     // Returns same if no change
     const newData = property.set(store._data, key, value, options);
