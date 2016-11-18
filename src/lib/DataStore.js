@@ -20,12 +20,10 @@ const update = require('./methods/update');
 
 const HANDLED_METHODS = {
   get: [get, ['key']],
-  reference: [reference, ['key']],
   reset: [reset, ['data']],
   remove: [remove, ['key']],
   set: [set, ['key', 'value', 'options']]
 };
-const RE_REF = /__ref:/;
 
 let uid = 0;
 
@@ -145,8 +143,8 @@ module.exports = class DataStore extends Emitter {
    * @returns {String|Array}
    */
   reference (key) {
-    if (!key || 'string' == typeof key) return this._handledMethods.reference(key);
-    if (Array.isArray(key)) return key.map((k) => this._handledMethods.reference(k));
+    if (!key || 'string' == typeof key) return reference(this, key);
+    if (Array.isArray(key)) return key.map((k) => reference(this, k));
   }
 
   /**
@@ -260,6 +258,26 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
+   * Determine if 'value' is reference
+   * @param {String} value
+   * @returns {Boolean}
+   */
+  _isRefValue (value) {
+    if (!value) return false;
+    return ('string' == typeof value && value.indexOf('__ref:') == 0);
+  }
+
+  /**
+   * Parse key from 'ref'
+   * @param {String} ref
+   * @returns {String}
+   */
+  _parseRefKey (ref) {
+    if ('string' != typeof ref) return ref;
+    return ref.slice(6);
+  }
+
+  /**
    * Resolve 'key' to nearest __ref key
    * @param {String} key
    * @returns {String}
@@ -267,16 +285,16 @@ module.exports = class DataStore extends Emitter {
   _resolveKeyRef (key) {
     const segs = key.split('/');
     const n = segs.length;
-    let data = this._data;
+    let value = this._data;
     let idx = 0;
     let ref = key;
 
     // Walk data tree from root looking for nearest __ref
     while (idx < n) {
-      if (data[segs[idx]] == null) break;
-      data = data[segs[idx]];
-      if ('string' == typeof data && RE_REF.test(data)) {
-        ref = data.slice(6);
+      if (value[segs[idx]] == null) break;
+      value = value[segs[idx]];
+      if (this._isRefValue(value)) {
+        ref = this._parseRefKey(value);
         break;
       }
       idx++;

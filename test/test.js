@@ -8,6 +8,7 @@ const get = require('../src/lib/methods/get');
 const HandlerContext = require('../src/lib/HandlerContext');
 const load = require('../src/lib/methods/load');
 const nock = require('nock');
+const reference = require('../src/lib/methods/reference');
 const reload = require('../src/lib/methods/reload');
 const set = require('../src/lib/methods/set');
 const remove = require('../src/lib/methods/remove');
@@ -30,7 +31,8 @@ describe('DataStore', function () {
         boo: '__ref:boo',
         bat: '__ref:bar'
       },
-      bat: ['foo', 'bar']
+      bat: ['foo', 'bar'],
+      boop: ['__ref:bar', '__ref:bat']
     });
   });
   afterEach(function () {
@@ -68,6 +70,12 @@ describe('DataStore', function () {
     });
     it('should return an array of referenced values', function () {
       expect(get(store, ['foo/boo/bar', 'foo/bat'])).to.eql(['foo', 'bat']);
+    });
+    it('should return a resolved object of referenced values', function () {
+      expect(get(store, 'foo')).to.eql({ bar: 'foo', boo: { bar: 'foo', bat: { foo: 'foo' } }, bat: 'bat' });
+    });
+    it('should return a resolved array of referenced values', function () {
+      expect(get(store, 'boop')).to.eql(['bat', ['foo', 'bar']]);
     });
   });
 
@@ -143,6 +151,18 @@ describe('DataStore', function () {
         done();
       });
       update(store, 'bar', 'bar', undefined, 'foo', true);
+    });
+  });
+
+  describe('reference()', function () {
+    it('should return a key reference', function () {
+      expect(reference(store, 'bar')).to.equal('__ref:bar');
+    });
+    it('should return an already referenced key reference', function () {
+      expect(reference(store, 'foo/boo')).to.equal('__ref:boo');
+    });
+    it('should return an array of key references', function () {
+      expect(reference(store, ['bar', 'foo/bar'])).to.eql(['__ref:bar', '__ref:foo/bar']);
     });
   });
 
@@ -301,8 +321,13 @@ describe('DataStore', function () {
 
           expect(cursor.get()).to.eql({
             bar: 'foo',
-            boo: '__ref:boo',
-            bat: '__ref:bar'
+            boo: {
+              bar: 'foo',
+              bat: {
+                foo: 'foo'
+              }
+            },
+            bat: 'bat'
           });
           expect(cursor.get()).to.eql(store.get('foo'));
         });
@@ -324,7 +349,7 @@ describe('DataStore', function () {
         it('should access updated data after update to store', function () {
           const cursor = store.createCursor('foo');
 
-          expect(cursor.get()).to.equal(store.get('foo'));
+          expect(cursor.get()).to.eql(store.get('foo'));
           store.set('foo', 'bar');
           expect(cursor.get()).to.equal('bar');
         });
@@ -386,10 +411,15 @@ describe('DataStore', function () {
 
     describe('dump()', function () {
       it('should return a serialisable json object with no excluded properties', function () {
-        store.set('bing', 'bong', { serialisable: false });
-        const obj = store.dump();
+        store.setSerialisabilityOfKey('bar', false);
+        const data = store.dump();
 
-        expect(obj.bing).to.equal('bong');
+        expect(data.bar).to.equal('bat');
+      });
+      it('should return an object with resolved references', function () {
+        const data = store.dump();
+
+        expect(data.foo.boo.bar).to.equal('foo');
       });
       it('should optionally return a serialised string', function () {
         const json = store.dump(true);

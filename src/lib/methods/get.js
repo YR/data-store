@@ -1,5 +1,6 @@
 'use strict';
 
+const isPlainObject = require('is-plain-obj');
 const property = require('@yr/property');
 
 /**
@@ -26,5 +27,26 @@ module.exports = function get (store, key) {
 function doGet (store, key) {
   // Resolve back to original key if referenced
   key = store._resolveKeyRef(key);
-  return property.get(store._data, key);
+
+  const value = property.get(store._data, key);
+
+  // Shallow resolve embedded references
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      return store._isRefValue(item)
+        ? property.get(store._data, store._parseRefKey(item))
+        : item;
+    });
+  } else if (isPlainObject(value)) {
+    let v = {};
+
+    for (const prop in value) {
+      v[prop] = store._isRefValue(value[prop])
+        ? property.get(store._data, store._parseRefKey(value[prop]))
+        : value[prop];
+    }
+    return v;
+  }
+
+  return value;
 }
