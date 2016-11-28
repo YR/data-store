@@ -198,8 +198,6 @@ module.exports = class DataStore extends Emitter {
    * @param {Boolean} value
    */
   setSerialisabilityOfKey (key, value) {
-    if (key.charAt(0) == '/') key = key.slice(1);
-
     // Handle batch
     if (isPlainObject(key)) {
       for (const k in key) {
@@ -207,6 +205,8 @@ module.exports = class DataStore extends Emitter {
       }
       return;
     }
+
+    if (key.charAt(0) == '/') key = key.slice(1);
 
     this._serialisableKeys[key] = value;
   }
