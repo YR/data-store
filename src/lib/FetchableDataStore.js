@@ -26,12 +26,12 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Object} serialisableKeys
    */
   constructor (id, data, options = {}) {
+    options.handledMethods = { fetch: [fetch, ['key', 'url', 'options']] };
+
     super(id, data, options);
 
     this.EXPIRES_KEY = EXPIRES_KEY;
     this._fetchedKeys = {};
-
-    this._registerHandledMethod('fetch', fetch, ['key', 'url', 'options']);
   }
 
   /**

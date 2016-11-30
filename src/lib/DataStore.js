@@ -7,6 +7,7 @@
 
 'use strict';
 
+const assign = require('object-assign');
 const Cursor = require('./DataStoreCursor');
 const Debug = require('debug');
 const Emitter = require('eventemitter3');
@@ -51,8 +52,11 @@ module.exports = class DataStore extends Emitter {
     this._handlers = {};
     this._serialisableKeys = options.serialisableKeys || {};
 
-    for (const methodName in HANDLED_METHODS) {
-      this._registerHandledMethod(methodName, ...HANDLED_METHODS[methodName]);
+    // Allow sub classes to send in methods for registration
+    const handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
+
+    for (const methodName in handledMethods) {
+      this._registerHandledMethod(methodName, ...handledMethods[methodName]);
     }
     if (options.handlers) this.registerMethodHandler(options.handlers);
 

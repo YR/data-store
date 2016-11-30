@@ -595,6 +595,14 @@ describe('FetchableDataStore', function () {
     store.destroy();
   });
 
+  describe('constructor', function () {
+    it('should register handlers', function () {
+      store.destroy();
+      store = createStore('store', {}, { isFetchable: true, handlers: [['fetch', /foo/, function (context) {}]] });
+      expect(store._handledMethods).to.have.property('fetch');
+    });
+  });
+
   describe('load()', function () {
     beforeEach(function () {
       fake = nock('http://localhost');
