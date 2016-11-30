@@ -66,6 +66,14 @@ store.update('foo/bar/bat', true, null, 'foo');
 
 Options are the same as for [`set()`](#set-key-stringobject-value--options-object), with the exception that immutability is always enforced.
 
+#### `reference (key: String|Array): String|Array`
+Retrieve reference to value stored at `key`. If `key` is an array of strings, returns an array of reference keys:
+
+```js
+store.set('stuff', store.reference(['foo/bar/bat', 'bar']));
+store.get('stuff/0'); //=> true
+```
+
 #### `remove (key: String|Array)`
 Remove value stored at `key`. If `key` is an array of keys, batch removes values:
 
