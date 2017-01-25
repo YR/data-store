@@ -131,14 +131,13 @@ Options include:
 - **`abort: Boolean`** abort existing (outstanding) request to same url [default: `false`]
 - **`ignoreQuery: Boolean`** ignore query parameters of `url` when matching existing, oustanding requests for the same url [default: `false`]
 - **`minExpiry: Number`** the minimum expiry (in ms) to use in cases of invalid `expires` [default: `60000`]
-- **`reload: Boolean`** specify whether to automatically reload data on expiry [default: `false`]
 - **`retries: Number`** the number of times to retry load on error [default: `2`]
 - **`staleWhileRevalidate: Boolean`** specify whether to resolve returned promise with stale value or wait for loaded [default: `false`]
 - **`staleIfError: Boolean`** specify whether to resolve returned promise with stale value or `null` after load error [default: `false`]
 - **`timeout: Number`** the timeout duration (in ms) before attempting retry [default: `5000`]
 
 #### `abort (key: String|Array)`
-Abort outstanding `load`/`reload` operations. If `key` is omitted, all operations will be aborted:
+Abort outstanding `load` operations. If `key` is omitted, all operations will be aborted:
 
 ```js
 store

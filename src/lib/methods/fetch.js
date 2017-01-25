@@ -3,7 +3,6 @@
 const get = require('./get');
 const isPlainObject = require('is-plain-obj');
 const load = require('./load');
-const reload = require('./reload');
 
 /**
  * Fetch data. If expired, load from 'url' and store at 'key'
@@ -15,7 +14,6 @@ const reload = require('./reload');
  *  - {Boolean} abort
  *  - {Boolean} ignoreQuery
  *  - {Number} minExpiry
- *  - {Boolean} reload
  *  - {Number} retry
  *  - {Boolean} staleWhileRevalidate
  *  - {Boolean} staleIfError
@@ -40,7 +38,6 @@ module.exports = function fetch (store, key, url, options = {}) {
  *  - {Boolean} abort
  *  - {Boolean} ignoreQuery
  *  - {Number} minExpiry
- *  - {Boolean} reload
  *  - {Number} retry
  *  - {Boolean} staleWhileRevalidate
  *  - {Boolean} staleIfError
@@ -48,7 +45,7 @@ module.exports = function fetch (store, key, url, options = {}) {
  * @returns {Promise}
  */
 function doFetch (store, key, url, options) {
-  const { reload: shouldReload, staleWhileRevalidate, staleIfError } = options;
+  const { staleWhileRevalidate, staleIfError } = options;
   const value = get(store, key);
   const isMissingOrExpired = !value || hasExpired(value, store.EXPIRES_KEY);
 
@@ -59,8 +56,6 @@ function doFetch (store, key, url, options) {
     const promiseToLoad = new Promise((resolve, reject) => {
       load(store, key, url, options)
         .then((res) => {
-          // Schedule a reload
-          if (shouldReload) reload(store, key, url, options);
           resolve({
             duration: res.duration,
             headers: res.headers,
@@ -68,8 +63,6 @@ function doFetch (store, key, url, options) {
           });
         })
         .catch((err) => {
-          // Schedule a reload if error
-          if (err.status >= 500 && shouldReload) reload(store, key, url, options);
           if (!staleIfError) return reject(err);
           resolve({
             duration: 0,
@@ -85,8 +78,6 @@ function doFetch (store, key, url, options) {
     promiseToLoad.catch((err) => { /* promise never returned, so swallow error */ });
   }
 
-  // Schedule a reload
-  if (shouldReload) reload(store, key, url, options);
   // Return data (possibly stale)
   return Promise.resolve({
     duration: 0,

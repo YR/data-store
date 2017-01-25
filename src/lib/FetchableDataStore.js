@@ -2,7 +2,6 @@
 
 const agent = require('@yr/agent');
 const assign = require('object-assign');
-const clock = require('@yr/clock');
 const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
 const isPlainObject = require('is-plain-obj');
@@ -43,7 +42,6 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Boolean} abort
    *  - {Boolean} ignoreQuery
    *  - {Number} minExpiry
-   *  - {Boolean} reload
    *  - {Number} retries
    *  - {Boolean} staleWhileRevalidate
    *  - {Boolean} staleIfError
@@ -71,7 +69,7 @@ module.exports = class FetchableDataStore extends DataStore {
   }
 
   /**
-   * Abort all outstanding load/reload requests
+   * Abort all outstanding load requests
    * @param {String|Array} [key]
    */
   abort (key) {
@@ -79,9 +77,6 @@ module.exports = class FetchableDataStore extends DataStore {
     if (!key) {
       // Too dangerous to abort on server in case more than one outstanding request
       if (runtime.isBrowser) agent.abortAll((req) => this._fetchedKeys[req.__agentId]);
-      for (const key in this._fetchedKeys) {
-        clock.cancel(key);
-      }
       this._fetchedKeys = {};
       return;
     }
@@ -89,7 +84,6 @@ module.exports = class FetchableDataStore extends DataStore {
     if ('string' == typeof key) key = [key];
     key.forEach((k) => {
       if (runtime.isBrowser) agent.abortAll(k);
-      clock.cancel(k);
       delete this._fetchedKeys[k];
     });
   }
