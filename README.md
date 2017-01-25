@@ -33,6 +33,31 @@ Register a method handler for `methodName` (see [handlers](#handlers)):
 store.registerMethodHandler('get', /foo/, function (context) { /* */ });
 ```
 
+Batch register handlers by passing an array of arrays:
+
+```js
+store.registerMethodHandler([
+  ['get', /foo/, function (context) { /* */ }], 
+  ['set', /foo/, function (context) { /* */ }]
+]);
+```
+
+#### `unregisterMethodHandler (methodName: String|Array, match: RegExp, handler: Function)`
+Unregister a previously registerd method handler:
+
+```js
+store.unregisterMethodHandler('get', /foo/, function (context) { /* */ });
+```
+
+Batch unregister handlers by passing an array of arrays:
+
+```js
+store.unregisterMethodHandler([
+  ['get', /foo/, function (context) { /* */ }], 
+  ['set', /foo/, function (context) { /* */ }]
+]);
+```
+
 #### `get (key: String|Array): *` 
 Retrieve value stored at `key`. If `key` is an array of strings, returns an array of values:
 
