@@ -573,6 +573,36 @@ describe('DataStore', function () {
         });
       });
     });
+
+    describe('unhandling', function () {
+      it('should remove a single handler', function () {
+        let run = 0;
+        const fn = function (context) {
+          run++;
+        };
+
+        store.registerMethodHandler('get', null, fn);
+        expect(store.get('bar')).to.equal('bat');
+        expect(run).to.equal(1);
+        store.unregisterMethodHandler('get', null, fn);
+        expect(store.get('bar')).to.equal('bat');
+        expect(run).to.equal(1);
+      });
+      it('should remove batched handlers', function () {
+        let run = 0;
+        const handlers = [
+          ['get', null, function (context) { run++; }],
+          ['get', null, function (context) { run++; }]
+        ];
+
+        store.registerMethodHandler(handlers);
+        expect(store.get('bar')).to.equal('bat');
+        expect(run).to.equal(2);
+        store.unregisterMethodHandler(handlers);
+        expect(store.get('bar')).to.equal('bat');
+        expect(run).to.equal(2);
+      });
+    });
   });
 });
 

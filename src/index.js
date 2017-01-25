@@ -1,5 +1,5 @@
 /**
- * A clever data object
+ * A smart data store
  * https://github.com/yr/data-store
  * @copyright Yr
  * @license MIT

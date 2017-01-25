@@ -1,10 +1,3 @@
-/**
- * A clever data object
- * https://github.com/yr/data-store
- * @copyright Yr
- * @license MIT
- */
-
 'use strict';
 
 const assign = require('object-assign');
@@ -66,8 +59,8 @@ module.exports = class DataStore extends Emitter {
   /**
    * Register 'handler' for 'methodName' with 'match'
    * @param {String|Array} methodName
-   * @param {RegExp} match
-   * @param {Function} handler
+   * @param {RegExp} [match]
+   * @param {Function} [handler]
    * @returns {null}
    */
   registerMethodHandler (methodName, match, handler) {
@@ -80,6 +73,32 @@ module.exports = class DataStore extends Emitter {
 
     if (!this._handlers[methodName]) throw Error(`${methodName} is not a recognised method for handling`);
     this._handlers[methodName].push({ handler, match });
+  }
+
+  /**
+   * Unregister 'handler' for 'methodName'
+   * @param {String|Array} methodName
+   * @param {RegExp} [match]
+   * @param {Function} [handler]
+   * @returns {null}
+   */
+  unregisterMethodHandler (methodName, match, handler) {
+    // Handle bulk
+    if (Array.isArray(methodName)) {
+      return methodName.forEach((item) => {
+        this.unregisterMethodHandler(...item);
+      });
+    }
+
+    if (this._handlers[methodName]) {
+      let i = this._handlers[methodName].length;
+
+      while (--i >= 0) {
+        if (this._handlers[methodName][i].handler === handler) {
+          this._handlers[methodName].splice(i, 1);
+        }
+      }
+    }
   }
 
   /**
