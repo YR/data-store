@@ -73,6 +73,7 @@ module.exports = class DataStore extends Emitter {
 
     if (!this._handlers[methodName]) throw Error(`${methodName} is not a recognised method for handling`);
     this._handlers[methodName].push({ handler, match });
+    this.debug(`registered handler for ${methodName}`);
   }
 
   /**
@@ -96,6 +97,7 @@ module.exports = class DataStore extends Emitter {
       while (--i >= 0) {
         if (this._handlers[methodName][i].handler === handler) {
           this._handlers[methodName].splice(i, 1);
+          this.debug(`unregistered handler for ${methodName}`);
         }
       }
     }
