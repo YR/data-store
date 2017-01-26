@@ -2,11 +2,11 @@
 # yarn lockfile v1
 
 
-"@yr/agent@5.0.0-rc1":
-  version "5.0.0-rc1"
-  resolved "https://registry.yarnpkg.com/@yr/agent/-/agent-5.0.0-rc1.tgz#06faa73e9ba7953d79a8fe5118c94537edb91003"
+"@yr/agent@5.0.x":
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/@yr/agent/-/agent-5.0.0.tgz#bd51855fb1d8fec28c045f8d209db5cc00d3a228"
   dependencies:
-    superagent visionmedia/superagent
+    superagent "3.4.x"
 
 "@yr/clock@1.1.x":
   version "1.1.12"
@@ -728,8 +728,8 @@ caniuse-api@^1.5.2:
     shelljs "^0.7.0"
 
 caniuse-db@^1.0.30000346, caniuse-db@^1.0.30000613:
-  version "1.0.30000615"
-  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000615.tgz#605bc071db4c5031acfb5e469c3b50a531dd5d04"
+  version "1.0.30000617"
+  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000617.tgz#9b7fd81f58a35526315c83e60cb5f076f0beb392"
 
 caseless@~0.11.0:
   version "0.11.0"
@@ -2411,9 +2411,9 @@ strip-json-comments@~1.0.4:
   version "1.0.4"
   resolved "https://registry.yarnpkg.com/strip-json-comments/-/strip-json-comments-1.0.4.tgz#1e15fbcac97d3ee99bf2d73b4c656b082bbafb91"
 
-superagent@visionmedia/superagent:
-  version "3.3.2"
-  resolved "https://codeload.github.com/visionmedia/superagent/tar.gz/ecb3ff657802dcc647113afbf19216e890977018"
+superagent@3.4.x:
+  version "3.4.0"
+  resolved "https://registry.yarnpkg.com/superagent/-/superagent-3.4.0.tgz#cf8e40b303d5b2949c0fb036ddc30927e14958c7"
   dependencies:
     component-emitter "^1.2.0"
     cookiejar "^2.0.6"
