@@ -70,7 +70,7 @@ module.exports = class HandlerContext {
    */
   merge (propName, prop) {
     if (!isPlainObject(prop)) return;
-    this[propName] = assign({}, prop, this[propName]);
+    this[propName] = assign({}, this[propName], prop);
   }
 
   /**

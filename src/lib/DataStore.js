@@ -45,6 +45,8 @@ module.exports = class DataStore extends Emitter {
     this._handlers = {};
     this._serialisableKeys = options.serialisableKeys || {};
 
+    this.debug('created');
+
     // Allow sub classes to send in methods for registration
     const handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
 
@@ -194,6 +196,7 @@ module.exports = class DataStore extends Emitter {
     this._handlers = {};
     this._serialisableKeys = {};
     this.removeAllListeners();
+    this.debug('destroyed');
   }
 
   /**

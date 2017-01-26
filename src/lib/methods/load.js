@@ -40,7 +40,7 @@ module.exports = function load (store, key, url, options) {
           data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry);
         }
 
-        // Enable routing/handling by not call set() directly
+        // Enable routing/handling by not calling inner set()
         value = store.set(key, data, options);
       }
 
