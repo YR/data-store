@@ -12,6 +12,7 @@ const DEFAULT_LOAD_OPTIONS = {
   retry: 2,
   timeout: 5000
 };
+const GRACE = 10000;
 const EXPIRES_KEY = '__expires';
 
 module.exports = class FetchableDataStore extends DataStore {
@@ -29,6 +30,7 @@ module.exports = class FetchableDataStore extends DataStore {
 
     super(id, data, options);
 
+    this.GRACE = GRACE;
     this.EXPIRES_KEY = EXPIRES_KEY;
     this._fetchedKeys = {};
   }

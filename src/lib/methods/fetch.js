@@ -67,7 +67,7 @@ function doFetch (store, key, url, options) {
           resolve({
             duration: 0,
             error: err,
-            headers: { status: err.status },
+            headers: { expires: new Date(value[store.EXPIRES_KEY] + store.GRACE).toUTCString(), status: err.status },
             data: value
           });
         });
@@ -76,6 +76,7 @@ function doFetch (store, key, url, options) {
     if (!(value && staleWhileRevalidate)) return promiseToLoad;
     // Prevent unhandled
     promiseToLoad.catch((err) => { /* promise never returned, so swallow error */ });
+    // TODO: notify on load
   }
 
   // Return data (possibly stale)
