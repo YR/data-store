@@ -67,6 +67,9 @@ describe('DataStore', function () {
       expect(get(store, 'foo/boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
       expect(get(store, 'foo/boo/bat/foo')).to.eql('foo');
     });
+    it('should return a referenced value when passed a reference key', function () {
+      expect(get(store, '__ref:boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
+    });
     it('should return an array of referenced values', function () {
       expect(get(store, ['foo/boo/bar', 'foo/bat'])).to.eql(['foo', 'bat']);
     });

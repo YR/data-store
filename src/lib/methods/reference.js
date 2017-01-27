@@ -8,7 +8,7 @@
  * @returns {String}
  */
 module.exports = function reference (store, key) {
-  if (!key) return '__ref:';
+  if (!key) return store.REF_KEY;
   if ('string' == typeof key) return doReference(store, key);
   if (Array.isArray(key)) return key.map((k) => doReference(store, k));
 };
@@ -22,5 +22,5 @@ module.exports = function reference (store, key) {
 function doReference (store, key) {
   // Resolve back to original key if referenced
   key = store._resolveKeyRef(key);
-  return `__ref:${key}`;
+  return `${store.REF_KEY}${key}`;
 }

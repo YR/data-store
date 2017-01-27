@@ -18,6 +18,7 @@ const HANDLED_METHODS = {
   remove: [remove, ['key']],
   set: [set, ['key', 'value', 'options']]
 };
+const REF_KEY = '__ref:';
 
 let uid = 0;
 
@@ -33,6 +34,8 @@ module.exports = class DataStore extends Emitter {
    */
   constructor (id, data, options = {}) {
     super();
+
+    this.REF_KEY = REF_KEY;
 
     this.debug = Debug('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
@@ -289,7 +292,7 @@ module.exports = class DataStore extends Emitter {
    */
   _isRefValue (value) {
     if (!value) return false;
-    return ('string' == typeof value && value.indexOf('__ref:') == 0);
+    return ('string' == typeof value && value.indexOf(REF_KEY) == 0);
   }
 
   /**
@@ -299,7 +302,7 @@ module.exports = class DataStore extends Emitter {
    */
   _parseRefKey (ref) {
     if ('string' != typeof ref) return ref;
-    return ref.slice(6);
+    return ref.slice(REF_KEY.length);
   }
 
   /**
@@ -308,6 +311,9 @@ module.exports = class DataStore extends Emitter {
    * @returns {String}
    */
   _resolveKeyRef (key) {
+    // Handle passing of __ref key
+    if (this._isRefValue(key)) return this._parseRefKey(key);
+
     const segs = key.split('/');
     const n = segs.length;
     let value = this._data;
