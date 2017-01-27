@@ -2,8 +2,6 @@
 
 const agent = require('@yr/agent');
 
-const GRACE = 10000;
-
 /**
  * Load data from 'url' and store at 'key'
  * @param {DataStore} store
@@ -22,52 +20,55 @@ module.exports = function load (store, key, url, options) {
 
   store.debug('load %s from %s', key, url);
 
-  return agent
+  const req = agent
     .get(url, options)
-    .timeout(options.timeout)
-    .retry(options.retries)
-    .then((res) => {
-      store.debug('loaded "%s" in %dms', key, res.duration);
+    .timeout(options.timeout);
 
-      let value;
+  if (options.retries) req.retry(options.retries);
 
-      // Guard against empty data
-      if (res.body) {
-        let data = res.body;
+  return req.then((res) => {
+    store.debug('loaded "%s" in %dms', key, res.duration);
 
-        // Add expires header
-        if (res.headers && 'expires' in res.headers) {
-          data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry);
-        }
+    let value;
 
-        // Enable routing/handling by not calling inner set()
-        value = store.set(key, data, options);
+    // Guard against empty data
+    if (res.body) {
+      let data = res.body;
+
+      // Add expires header
+      if (res.headers && 'expires' in res.headers) {
+        data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry, store.GRACE);
       }
 
-      store.emit(`load:${key}`, value);
-      store.emit('load', key, value);
+      // Enable routing/handling by not calling inner set()
+      value = store.set(key, data, options);
+    }
 
-      return res;
-    })
-    .catch((err) => {
-      store.debug('unable to load "%s" from %s', key, url);
+    store.emit(`load:${key}`, value);
+    store.emit('load', key, value);
 
-      // Remove if not found or malformed (but not aborted)
-      if (err.status < 499) store.remove(key);
+    return res;
+  })
+  .catch((err) => {
+    store.debug('unable to load "%s" from %s', key, url);
 
-      throw err;
-    });
+    // Remove if not found or malformed (but not aborted)
+    if (err.status < 499) store.remove(key);
+
+    throw err;
+  });
 };
 
 /**
  * Retrieve expiry from 'dateString'
  * @param {Number} dateString
  * @param {Number} minimum
+ * @param {Number} grace
  * @returns {Number}
  */
-function getExpiry (dateString, minimum) {
+function getExpiry (dateString, minimum, grace) {
   // Add latency overhead to compensate for transmission time
-  const expires = +(new Date(dateString)) + GRACE;
+  const expires = +(new Date(dateString)) + grace;
   const now = Date.now();
 
   return (expires > now)
