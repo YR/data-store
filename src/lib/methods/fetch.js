@@ -45,7 +45,7 @@ module.exports = function fetch (store, key, url, options = {}) {
  * @returns {Promise}
  */
 function doFetch (store, key, url, options) {
-  const { staleWhileRevalidate, staleIfError } = options;
+  const { minExpiry, staleWhileRevalidate, staleIfError } = options;
   const value = get(store, key);
   const isMissingOrExpired = !value || hasExpired(value, store.EXPIRES_KEY);
 
@@ -67,7 +67,7 @@ function doFetch (store, key, url, options) {
           resolve({
             duration: 0,
             error: err,
-            headers: { expires: new Date(value[store.EXPIRES_KEY] + store.GRACE).toUTCString(), status: err.status },
+            headers: { expires: (new Date(Date.now() + minExpiry)).toUTCString(), status: err.status },
             data: value
           });
         });
