@@ -20,43 +20,41 @@ module.exports = function load (store, key, url, options) {
 
   store.debug('load %s from %s', key, url);
 
-  const req = agent
+  return agent
     .get(url, options)
-    .timeout(options.timeout);
+    .timeout(options.timeout)
+    .retry(options.retries)
+    .then((res) => {
+      store.debug('loaded "%s" in %dms', key, res.duration);
 
-  if (options.retries) req.retry(options.retries);
+      let value;
 
-  return req.then((res) => {
-    store.debug('loaded "%s" in %dms', key, res.duration);
+      // Guard against empty data
+      if (res.body) {
+        let data = res.body;
 
-    let value;
+        // Add expires header
+        if (res.headers && 'expires' in res.headers) {
+          data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry, store.GRACE);
+        }
 
-    // Guard against empty data
-    if (res.body) {
-      let data = res.body;
-
-      // Add expires header
-      if (res.headers && 'expires' in res.headers) {
-        data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry, store.GRACE);
+        // Enable routing/handling by not calling inner set()
+        value = store.set(key, data, options);
       }
 
-      // Enable routing/handling by not calling inner set()
-      value = store.set(key, data, options);
-    }
+      store.emit(`load:${key}`, value);
+      store.emit('load', key, value);
 
-    store.emit(`load:${key}`, value);
-    store.emit('load', key, value);
+      return res;
+    })
+    .catch((err) => {
+      store.debug('unable to load "%s" from %s', key, url);
 
-    return res;
-  })
-  .catch((err) => {
-    store.debug('unable to load "%s" from %s', key, url);
+      // Remove if not found or malformed (but not aborted)
+      if (err.status < 499) store.remove(key);
 
-    // Remove if not found or malformed (but not aborted)
-    if (err.status < 499) store.remove(key);
-
-    throw err;
-  });
+      throw err;
+    });
 };
 
 /**
