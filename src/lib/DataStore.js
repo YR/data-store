@@ -313,6 +313,8 @@ module.exports = class DataStore extends Emitter {
   _resolveKeyRef (key) {
     // Handle passing of __ref key
     if (this._isRefValue(key)) return this._parseRefKey(key);
+    // Trim leading '/' (cursors)
+    if (key.charAt(0) == '/') key = key.slice(1);
 
     const segs = key.split('/');
     const n = segs.length;

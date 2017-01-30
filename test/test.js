@@ -341,6 +341,13 @@ describe('DataStore', function () {
           expect(cursor1.get('bar')).to.equal('bat');
           expect(cursor2.get('bar')).to.equal('foo');
         });
+        it('should enable creating a cursor from an existing cursor at reference "key"', function () {
+          const cursor1 = store.createCursor('foo');
+          const cursor2 = cursor1.createCursor('boo');
+
+          expect(cursor1.get('boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
+          expect(cursor2.get()).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
+        });
         it('should allow access to root properties', function () {
           store.set('bat', 'zip');
           const cursor1 = store.createCursor('foo');
