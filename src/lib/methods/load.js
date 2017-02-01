@@ -12,6 +12,7 @@ const agent = require('@yr/agent');
  *  - {Boolean} ignoreQuery
  *  - {Number} minExpiry
  *  - {Number} retries
+ *  - {Boolean} staleIfError
  *  - {Number} timeout
  * @returns {Promise}
  */
@@ -38,7 +39,7 @@ module.exports = function load (store, key, url, options) {
           data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry, store.GRACE);
         }
 
-        // Enable routing/handling by not calling inner set()
+        // Enable handling by not calling inner set()
         value = store.set(key, data, options);
       }
 
@@ -50,8 +51,7 @@ module.exports = function load (store, key, url, options) {
     .catch((err) => {
       store.debug('unable to load "%s" from %s', key, url);
 
-      // Remove if not found or malformed (but not aborted)
-      if (err.status < 499) store.remove(key);
+      if (!options.staleIfError) store.set(key, null, options);
 
       throw err;
     });

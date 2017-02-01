@@ -688,6 +688,19 @@ describe('FetchableDataStore', function () {
           expect(result.data).to.equal('bat');
         });
     });
+    it('should return a Promise with the value, triggering a synthetic set()', function () {
+      let run = 0;
+
+      store.registerMethodHandler('set', /^bar$/, function (context) {
+        run++;
+      });
+
+      return fetch(store, 'bar', null, {})
+        .then((result) => {
+          expect(result.data).to.equal('bat');
+          expect(run).to.equal(1);
+        });
+    });
     it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
       set(store, 'foo/__expires', 0);
 

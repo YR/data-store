@@ -76,7 +76,9 @@ function doFetch (store, key, url, options) {
     if (!(value && staleWhileRevalidate)) return promiseToLoad;
     // Prevent unhandled
     promiseToLoad.catch((err) => { /* promise never returned, so swallow error */ });
-    // TODO: notify on load
+  } else {
+    // Enable handling for non-stale data
+    store.set(key, value, options);
   }
 
   // Return data (possibly stale)
