@@ -26,13 +26,14 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Object} serialisableKeys
    */
   constructor (id, data, options = {}) {
-    options.handledMethods = { fetch: [fetch, ['key', 'url', 'options']] };
+    options.handledMethods = {
+      fetch: [fetch, ['key', 'url', 'options']]
+    };
 
     super(id, data, options);
 
     this.GRACE = GRACE;
     this.EXPIRES_KEY = EXPIRES_KEY;
-    this._fetchedKeys = {};
   }
 
   /**
@@ -55,39 +56,20 @@ module.exports = class FetchableDataStore extends DataStore {
 
     options = assign({}, DEFAULT_LOAD_OPTIONS, options);
 
-    if ('string' == typeof key) {
-      if (!this._fetchedKeys[key]) this._fetchedKeys[key] = true;
-      return this._handledMethods.fetch(key, url, options);
-    }
+    if ('string' == typeof key) return this._handledMethods.fetch(key, url, options);
 
     if (isPlainObject(key)) {
-      return Promise.all(Object.keys(key)
-        .map((k) => {
-          if (!this._fetchedKeys[k]) this._fetchedKeys[k] = true;
-          return this._handledMethods.fetch(k, key[k], options);
-        })
-      );
+      return Promise.all(Object.keys(key).map((k) => this._handledMethods.fetch(k, key[k], options)));
     }
   }
 
   /**
    * Abort all outstanding load requests
-   * @param {String|Array} [key]
+   * @param {String} [key]
    */
   abort (key) {
-    // Abort all
-    if (!key) {
-      // Too dangerous to abort on server in case more than one outstanding request
-      if (runtime.isBrowser) agent.abortAll((req) => this._fetchedKeys[req.__agentId]);
-      this._fetchedKeys = {};
-      return;
-    }
-
-    if ('string' == typeof key) key = [key];
-    key.forEach((k) => {
-      if (runtime.isBrowser) agent.abortAll(k);
-      delete this._fetchedKeys[k];
-    });
+    // Too dangerous to abort on server in case more than one outstanding request
+    if (runtime.isBrowser) agent.abortAll(key);
   }
 
   /**
