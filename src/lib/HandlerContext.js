@@ -7,10 +7,12 @@ module.exports = class HandlerContext {
   /**
    * Constructor
    * @param {DataStore} store
+   * @param {String} methodName
    * @param {Array} signature
    * @param {Array} args
    */
-  constructor (store, signature, args) {
+  constructor (store, methodName, signature, args) {
+    this.method = methodName;
     this.signature = signature;
     this.store = store;
 
@@ -24,42 +26,6 @@ module.exports = class HandlerContext {
       } else {
         this[prop] = args[i];
       }
-    }
-  }
-
-  /**
-   * Batch 'key' with existing
-   * @param {String|Object} key
-   * @param {*} [value]
-   */
-  batch (key, value) {
-    if (!this.key) this.key = '';
-
-    const asArray = (value === undefined);
-    const isString = ('string' == typeof key);
-    const valueName = this.signature[1];
-
-    // Convert existing to hash/array
-    if ('string' == typeof this.key) {
-      this.key = asArray
-        ? [this.key]
-        : { [this.key]: this[valueName] };
-      if (valueName in this) this[valueName] = null;
-    }
-
-    if (asArray) {
-      if (isString) {
-        this.key.push(key);
-      } else {
-        this.key.push(...key);
-      }
-      return;
-    }
-
-    if (isString) {
-      this.key[key] = value;
-    } else {
-      this.key = assign(this.key, key);
     }
   }
 

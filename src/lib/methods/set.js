@@ -46,7 +46,7 @@ module.exports = function set (store, key, value, options) {
  */
 function doSet (store, key, value, options) {
   // Resolve back to original key if referenced
-  key = store._resolveKeyRef(key);
+  key = store._resolveRefKey(key);
 
   if (options.immutable) {
     // Returns same if no change

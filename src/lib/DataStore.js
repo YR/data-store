@@ -8,14 +8,11 @@ const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
 const reference = require('./methods/reference');
-const remove = require('./methods/remove');
 const set = require('./methods/set');
 const update = require('./methods/update');
 
 const HANDLED_METHODS = {
-  get: [get, ['key']],
   reset: [reset, ['data']],
-  remove: [remove, ['key']],
   set: [set, ['key', 'value', 'options']]
 };
 const REF_KEY = '__ref:';
@@ -45,7 +42,7 @@ module.exports = class DataStore extends Emitter {
     this._cursors = {};
     this._data = {};
     this._handledMethods = {};
-    this._handlers = {};
+    this._handlers = [];
     this._serialisableKeys = options.serialisableKeys || {};
 
     this.debug('created');
@@ -56,53 +53,54 @@ module.exports = class DataStore extends Emitter {
     for (const methodName in handledMethods) {
       this._registerHandledMethod(methodName, ...handledMethods[methodName]);
     }
-    if (options.handlers) this.registerMethodHandler(options.handlers);
+    if (options.handlers) this.use(options.handlers);
 
     this.reset(data || {});
   }
 
   /**
-   * Register 'handler' for 'methodName' with 'match'
-   * @param {String|Array} methodName
-   * @param {RegExp} [match]
-   * @param {Function} [handler]
-   * @returns {null}
+   * Register 'handler' with optional key 'match'
+   * Will handle every transaction if no 'match'
+   * @param {RegExp|String|Array} [match]
+   * @param {Function} handler
    */
-  registerMethodHandler (methodName, match, handler) {
-    // Handle bulk
-    if (Array.isArray(methodName)) {
-      return methodName.forEach((item) => {
-        this.registerMethodHandler(...item);
-      });
-    }
+  use (match, handler) {
+    const matches = !Array.isArray(match)
+      ? [[match, handler]]
+      : match;
 
-    if (!this._handlers[methodName]) throw Error(`${methodName} is not a recognised method for handling`);
-    this._handlers[methodName].push({ handler, match });
-    this.debug(`registered handler for ${methodName}`);
+    const handlers = this._handlers.map(({ handler }) => handler);
+
+    matches.forEach(([match, handler]) => {
+      if ('function' == typeof match) {
+        handler = match;
+        match = '';
+      }
+      if (!~handlers.indexOf(handler)) {
+        this._handlers.push({ handler, match });
+      }
+    });
   }
 
   /**
-   * Unregister 'handler' for 'methodName'
-   * @param {String|Array} methodName
-   * @param {RegExp} [match]
-   * @param {Function} [handler]
-   * @returns {null}
+   * Unregister 'handler'
+   * @param {RegExp|String|Array} [match]
+   * @param {Function} handler
    */
-  unregisterMethodHandler (methodName, match, handler) {
-    // Handle bulk
-    if (Array.isArray(methodName)) {
-      return methodName.forEach((item) => {
-        this.unregisterMethodHandler(...item);
-      });
-    }
+  unuse (match, handler) {
+    const matches = !Array.isArray(match)
+      ? [[match, handler]]
+      : match;
 
-    if (this._handlers[methodName]) {
-      let i = this._handlers[methodName].length;
+    for (let i = 0, n = matches.length; i < n; i++) {
+      let [match, handler] = matches[i];
+      let j = this._handlers.length;
 
-      while (--i >= 0) {
-        if (this._handlers[methodName][i].handler === handler) {
-          this._handlers[methodName].splice(i, 1);
-          this.debug(`unregistered handler for ${methodName}`);
+      if ('function' == typeof match) handler = match;
+
+      while (--j >= 0) {
+        if (this._handlers[j].handler === handler) {
+          this._handlers.splice(j, 1);
         }
       }
     }
@@ -116,8 +114,8 @@ module.exports = class DataStore extends Emitter {
    * @returns {*}
    */
   get (key) {
-    if (!key || 'string' == typeof key) return this._handledMethods.get(key);
-    if (Array.isArray(key)) return key.map((k) => this._handledMethods.get(k));
+    if (!key || 'string' == typeof key) return get(this, key);
+    if (Array.isArray(key)) return key.map((k) => get(this, k));
   }
 
   /**
@@ -155,18 +153,6 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
-   * Remove 'key'
-   * Array of keys batch removes values
-   * @param {String} key
-   * @returns {null}
-   */
-  remove (key) {
-    if (!this.isWritable || !key) return;
-    if ('string' == typeof key) return this._handledMethods.remove(key);
-    if (Array.isArray(key)) return key.map((k) => this._handledMethods.remove(k));
-  }
-
-  /**
    * Retrieve reference to value stored at 'key'
    * Array of keys returns array of references
    * @param {String|Array} [key]
@@ -196,7 +182,7 @@ module.exports = class DataStore extends Emitter {
     this.destroyed = true;
     this._cursors = {};
     this._data = {};
-    this._handlers = {};
+    this._handlers = [];
     this._serialisableKeys = {};
     this.removeAllListeners();
     this.debug('destroyed');
@@ -208,7 +194,7 @@ module.exports = class DataStore extends Emitter {
    * @returns {DataStore}
    */
   createCursor (key) {
-    key = this._resolveKeyRef(key || '');
+    key = this._resolveRefKey(key || '');
     // Prefix all keys with separator
     if (key && key.charAt(0) != '/') key = `/${key}`;
 
@@ -275,13 +261,14 @@ module.exports = class DataStore extends Emitter {
   /**
    * Determine if 'key' matches 'match'
    * @param {String} key
-   * @param {RegExp} match
+   * @param {RegExp|String} match
    * @returns {Boolean}
    */
   _isMatchKey (key, match) {
     // Treat no match as match all
     if (!match) return true;
     if (match instanceof RegExp) return match.test(key);
+    if ('string' == typeof match) return key.indexOf(match) == 0;
     return false;
   }
 
@@ -310,7 +297,7 @@ module.exports = class DataStore extends Emitter {
    * @param {String} key
    * @returns {String}
    */
-  _resolveKeyRef (key) {
+  _resolveRefKey (key) {
     // Handle passing of __ref key
     if (this._isRefValue(key)) return this._parseRefKey(key);
     // Trim leading '/' (cursors)
@@ -350,45 +337,41 @@ module.exports = class DataStore extends Emitter {
   _registerHandledMethod (methodName, fn, signature) {
     if (this._handledMethods[methodName]) return;
 
-    if (!this._handlers[methodName]) this._handlers[methodName] = [];
     // Partially apply arguments for routing
-    this._handledMethods[methodName] = this._routeHandledMethod.bind(this, fn.bind(this, this), signature, this._handlers[methodName]);
+    this._handledMethods[methodName] = this._routeHandledMethod.bind(this, methodName, fn, signature);
     // Expose method if it doesn't exist
     if (!this[methodName]) this[methodName] = this._handledMethods[methodName];
   }
 
   /**
-   * Route 'fn' through 'handlers'
+   * Route 'fn' through handlers
+   * @param {String} methodName
    * @param {Function} fn
    * @param {Array} signature
-   * @param {Object} handlers
    * @param {*} args
    * @returns {Object|null}
    */
-  _routeHandledMethod (fn, signature, handlers, ...args) {
+  _routeHandledMethod (methodName, fn, signature, ...args) {
     const isKeyed = signature[0] == 'key';
-    let [key, ...rest] = args;
+    let [key = '', ...rest] = args;
 
     if (isKeyed && key && key.charAt(0) == '/') key = key.slice(1);
 
     // Defer to handlers
-    if (handlers && handlers.length) {
-      const matchingHandlers = handlers.filter(({ match }) => !isKeyed || this._isMatchKey(key, match));
-      const context = new HandlerContext(this, signature, args);
-      let returnValue;
+    if (this._handlers.length) {
+      const context = new HandlerContext(this, methodName, signature, args);
 
-      for (let i = 0, n = matchingHandlers.length; i < n; i++) {
-        returnValue = matchingHandlers[i].handler(context);
-
-        // Exit on first return value
-        if (returnValue !== undefined) return returnValue;
+      for (let i = 0, n = this._handlers.length; i < n; i++) {
+        if (this._isMatchKey(key, this._handlers[i].match)) this._handlers[i].handler(context);
       }
-      returnValue = fn(...context.toArguments());
+
+      const value = fn(this, ...context.toArguments());
+
       context.destroy();
-      return returnValue;
+      return value;
     }
 
-    return fn(key, ...rest);
+    return fn(this, key, ...rest);
   }
 };
 

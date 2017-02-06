@@ -26,7 +26,7 @@ module.exports = function get (store, key) {
  */
 function doGet (store, key) {
   // Resolve back to original key if referenced
-  key = store._resolveKeyRef(key);
+  key = store._resolveRefKey(key);
 
   const value = property.get(store._data, key);
 

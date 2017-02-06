@@ -6,11 +6,9 @@ const expect = require('expect.js');
 const fetch = require('../src/lib/methods/fetch');
 const get = require('../src/lib/methods/get');
 const HandlerContext = require('../src/lib/HandlerContext');
-const load = require('../src/lib/methods/load');
 const nock = require('nock');
 const reference = require('../src/lib/methods/reference');
 const set = require('../src/lib/methods/set');
-const remove = require('../src/lib/methods/remove');
 const update = require('../src/lib/methods/update');
 
 let fake, store;
@@ -36,20 +34,6 @@ describe('DataStore', function () {
   });
   afterEach(function () {
     store.destroy();
-  });
-
-  describe('_resolveKeyRef()', function () {
-    it('should resolve key with no references', function () {
-      expect(store._resolveKeyRef('bar')).to.equal('bar');
-      expect(store._resolveKeyRef('zing/zoop')).to.equal('zing/zoop');
-    });
-    it('should resolve key with references', function () {
-      expect(store._resolveKeyRef('foo/boo')).to.equal('boo');
-    });
-    it('should resolve nested key with references', function () {
-      expect(store._resolveKeyRef('foo/boo/bat/foo')).to.equal('boo/bat/foo');
-      expect(store._resolveKeyRef('foo/boo/zing/zoop')).to.equal('boo/zing/zoop');
-    });
   });
 
   describe('get()', function () {
@@ -104,22 +88,6 @@ describe('DataStore', function () {
     it('should update the original referenced value', function () {
       set(store, 'foo/boo/bar', 'bar');
       expect(store._data.boo.bar).to.equal('bar');
-    });
-  });
-
-  describe('remove()', function () {
-    it('should remove a key', function () {
-      remove(store, 'bar');
-      expect(get(store, 'bar')).to.eql(undefined);
-    });
-    it('should remove an array of keys', function () {
-      remove(store, ['bar', 'boo']);
-      expect(get(store, 'bar')).to.eql(undefined);
-      expect(get(store, 'boo')).to.eql(undefined);
-    });
-    it('should not remove a key that doesn\'t exist', function () {
-      remove(store, 'zing');
-      expect(get(store, 'zing')).to.eql(undefined);
     });
   });
 
@@ -180,6 +148,20 @@ describe('DataStore', function () {
       });
     });
 
+    describe('_resolveRefKey()', function () {
+      it('should resolve key with no references', function () {
+        expect(store._resolveRefKey('bar')).to.equal('bar');
+        expect(store._resolveRefKey('zing/zoop')).to.equal('zing/zoop');
+      });
+      it('should resolve key with references', function () {
+        expect(store._resolveRefKey('foo/boo')).to.equal('boo');
+      });
+      it('should resolve nested key with references', function () {
+        expect(store._resolveRefKey('foo/boo/bat/foo')).to.equal('boo/bat/foo');
+        expect(store._resolveRefKey('foo/boo/zing/zoop')).to.equal('boo/zing/zoop');
+      });
+    });
+
     describe('get()', function () {
       it('should return a value for a string key', function () {
         expect(store.get('bar')).to.equal('bat');
@@ -220,35 +202,10 @@ describe('DataStore', function () {
       });
     });
 
-    describe('remove()', function () {
-      it('should remove a key', function () {
-        store.remove('bar');
-        expect(store.get('bar')).to.eql(undefined);
-      });
-      it('should remove an array of keys', function () {
-        store.remove(['bar', 'boo']);
-        expect(store.get('bar')).to.eql(undefined);
-        expect(store.get('boo')).to.eql(undefined);
-      });
-      it('should not remove a key that doesn\'t exist', function () {
-        store.remove('zing');
-        expect(store.get('zing')).to.eql(undefined);
-      });
-      it('should do nothing if dataStore is not writable', function () {
-        store.isWritable = false;
-        store.remove('bar');
-        expect(store._data.bar).to.not.equal(undefined);
-      });
-    });
-
     describe('update()', function () {
       it('should set a value for "key"', function () {
         store.update('bar', 'bar');
         expect(store.get('bar')).to.equal('bar');
-      });
-      it('should remove "key" if value is null', function () {
-        store.update('bar', null);
-        expect(store.get('bar')).to.equal(undefined);
       });
       it('should allow batch writes', function () {
         store.update({ bar: 'bar', foo: 'bar' });
@@ -482,105 +439,54 @@ describe('DataStore', function () {
     });
 
     describe('handling', function () {
-      describe('get()', function () {
-        it('should allow handling', function () {
-          let run = 0;
+      it('should allow middleware', function () {
+        let run = 0;
 
-          store.registerMethodHandler('get', null, function (context) {
-            run++;
-          });
-          expect(store.get('bar')).to.equal('bat');
-          expect(run).to.equal(1);
+        store.use(function (context) {
+          run++;
+          expect(context.method).to.equal('reset');
         });
-        it('should allow matched handling', function () {
-          let run = 0;
-
-          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (context) {
-            run++;
-            expect(context.key).to.equal('foo/bar');
-          });
-          expect(store.get('foo/bar')).to.equal('foo');
-          expect(run).to.equal(1);
-        });
-        it('should allow delegation for computed values', function () {
-          let run = 0;
-
-          store.registerMethodHandler('get', /foo\/[a-z]ar/, function (context) {
-            run++;
-            return `${context.store.get('bar')} ${context.store.get('bat/0')}`;
-          });
-          expect(store.get('foo/bar')).to.equal('bat foo');
-          expect(run).to.equal(1);
-        });
-        it('should allow multiple delegates', function () {
-          let run = 0;
-
-          store.registerMethodHandler('get', /foo/, function (context) {
-            run++;
-          });
-          store.registerMethodHandler('get', /foo/, function (context) {
-            run++;
-          });
-          expect(store.get('foo/bar')).to.equal('foo');
-          expect(run).to.equal(2);
-        });
+        store.reset({});
+        expect(run).to.equal(1);
       });
+      it('should allow delegation', function () {
+        let run = 0;
 
-      describe('set()', function () {
-        it('should allow delegation', function () {
-          let run = 0;
-
-          store.registerMethodHandler('set', /zing/, function (context) {
-            run++;
-            context.value = 'bar';
-            expect(context.key).to.equal('zing');
-          });
-          store.set('zing', 'foo');
-          expect(store._data.zing).to.equal('bar');
-          expect(run).to.equal(1);
+        store.use(/zing/, function (context) {
+          run++;
+          context.value = 'bar';
+          expect(context.key).to.equal('zing');
+          expect(context.method).to.equal('set');
         });
-        it('should allow handling with option merging', function () {
-          let run = 0;
+        store.set('zing', 'foo');
+        expect(store._data.zing).to.equal('bar');
+        expect(run).to.equal(1);
+      });
+      it('should allow handling with option merging', function () {
+        let run = 0;
 
-          store.registerMethodHandler('set', /foo/, function (context) {
-            run++;
-            context.merge('options', { merge: false });
-            expect(context.key).to.equal('foo');
-          });
-          store.set('foo', { bar: 'bar' });
-          expect(store._data.foo).to.eql({ bar: 'bar' });
-          expect(run).to.equal(1);
+        store.use(/foo/, function (context) {
+          run++;
+          context.merge('options', { merge: false });
+          expect(context.key).to.equal('foo');
         });
-        it('should allow multiple handlers', function () {
-          let run = 0;
+        store.set('foo', { bar: 'bar' });
+        expect(store._data.foo).to.eql({ bar: 'bar' });
+        expect(run).to.equal(1);
+      });
+      it('should allow multiple handlers', function () {
+        let run = 0;
 
-          store.registerMethodHandler('set', /zing/, function (context) {
-            run++;
-            context.value = 'bar';
-          });
-          store.registerMethodHandler('set', /zing/, function (context) {
-            run++;
-          });
-          store.set('zing', 'foo');
-          expect(store._data.zing).to.equal('bar');
-          expect(run).to.equal(2);
+        store.use(/zing/, function (context) {
+          run++;
+          context.value = 'bar';
         });
-        it('should allow multiple handlers with key batching', function () {
-          let run = 0;
-
-          store.registerMethodHandler('set', /zing/, function (context) {
-            run++;
-            context.value = 'bar';
-          });
-          store.registerMethodHandler('set', /zing/, function (context) {
-            run++;
-            context.batch('zang', 'bar');
-          });
-          store.set('zing', 'foo');
-          expect(store._data.zing).to.equal('bar');
-          expect(store._data.zang).to.equal('bar');
-          expect(run).to.equal(2);
+        store.use(/zing/, function (context) {
+          run++;
         });
+        store.set('zing', 'foo');
+        expect(store._data.zing).to.equal('bar');
+        expect(run).to.equal(2);
       });
     });
 
@@ -591,25 +497,25 @@ describe('DataStore', function () {
           run++;
         };
 
-        store.registerMethodHandler('get', null, fn);
-        expect(store.get('bar')).to.equal('bat');
+        store.use(fn);
+        store.set('bar', 'boo');
         expect(run).to.equal(1);
-        store.unregisterMethodHandler('get', null, fn);
-        expect(store.get('bar')).to.equal('bat');
+        store.unuse(fn);
+        store.set('bar', 'boop');
         expect(run).to.equal(1);
       });
       it('should remove batched handlers', function () {
         let run = 0;
         const handlers = [
-          ['get', null, function (context) { run++; }],
-          ['get', null, function (context) { run++; }]
+          [function (context) { run++; }],
+          [function (context) { run++; }]
         ];
 
-        store.registerMethodHandler(handlers);
-        expect(store.get('bar')).to.equal('bat');
+        store.use(handlers);
+        store.set('bar', 'boo');
         expect(run).to.equal(2);
-        store.unregisterMethodHandler(handlers);
-        expect(store.get('bar')).to.equal('bat');
+        store.unuse(handlers);
+        store.set('bar', 'boop');
         expect(run).to.equal(2);
       });
     });
@@ -637,40 +543,8 @@ describe('FetchableDataStore', function () {
   describe('constructor', function () {
     it('should register handlers', function () {
       store.destroy();
-      store = createStore('store', {}, { isFetchable: true, handlers: [['fetch', /foo/, function (context) {}]] });
+      store = createStore('store', {}, { isFetchable: true, handlers: [[/foo/, function (context) {}]] });
       expect(store._handledMethods).to.have.property('fetch');
-    });
-  });
-
-  describe('load()', function () {
-    beforeEach(function () {
-      fake = nock('http://localhost');
-    });
-    afterEach(function () {
-      nock.cleanAll();
-    });
-
-    it('should load and store data for "key"', function () {
-      fake
-        .get('/foo')
-        .reply(200, { foo: 'foo' });
-
-      return load(store, 'foo', 'http://localhost/foo', {})
-        .then((res) => {
-          expect(get(store, 'foo')).to.have.property('foo', 'foo');
-        });
-    });
-    it('should load and store data for "key" with expires header value', function () {
-      const d = new Date();
-
-      fake
-        .get('/foo')
-        .reply(200, { foo: 'foo' }, { expires: d.toUTCString() });
-
-      return load(store, 'foo', 'http://localhost/foo', {})
-        .then((res) => {
-          expect(get(store, 'foo')).to.have.property('__expires');
-        });
     });
   });
 
@@ -686,19 +560,6 @@ describe('FetchableDataStore', function () {
       return fetch(store, 'bar', null, {})
         .then((result) => {
           expect(result.data).to.equal('bat');
-        });
-    });
-    it('should return a Promise with the value, triggering a synthetic set()', function () {
-      let run = 0;
-
-      store.registerMethodHandler('set', /^bar$/, function (context) {
-        run++;
-      });
-
-      return fetch(store, 'bar', null, {})
-        .then((result) => {
-          expect(result.data).to.equal('bat');
-          expect(run).to.equal(1);
         });
     });
     it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
@@ -766,13 +627,13 @@ describe('FetchableDataStore', function () {
 describe('HandlerContext', function () {
   describe('constructor', function () {
     it('should assign passed args based on signature', function () {
-      const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
+      const context = new HandlerContext({}, 'set', ['key', 'value'], ['foo', 'bar']);
 
       expect(context.key).to.equal('foo');
       expect(context.value).to.equal('bar');
     });
     it('should assign passed args, including rest argument', function () {
-      const context = new HandlerContext({}, ['key', 'value', '...args'], ['foo', 'bar', true]);
+      const context = new HandlerContext({}, 'set', ['key', 'value', '...args'], ['foo', 'bar', true]);
 
       expect(context.key).to.equal('foo');
       expect(context.value).to.equal('bar');
@@ -780,45 +641,15 @@ describe('HandlerContext', function () {
     });
   });
 
-  describe('batch', function () {
-    it('should batch key/value with simple key/value', function () {
-      const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
-
-      context.batch('boo', true);
-      expect(context.key).to.eql({ foo: 'bar', boo: true });
-      expect(context.value).to.eql(null);
-    });
-    it('should batch key/value with batched key/value', function () {
-      const context = new HandlerContext({}, ['key', 'value'], [{ foo: 'bar' }]);
-
-      context.batch('boo', true);
-      expect(context.key).to.eql({ foo: 'bar', boo: true });
-      expect(context.value).to.eql(undefined);
-
-    });
-    it('should batch key with simple key', function () {
-      const context = new HandlerContext({}, ['key'], ['foo']);
-
-      context.batch('boo');
-      expect(context.key).to.eql(['foo', 'boo']);
-    });
-    it('should batch key with batched key', function () {
-      const context = new HandlerContext({}, ['key'], [['foo']]);
-
-      context.batch('boo');
-      expect(context.key).to.eql(['foo', 'boo']);
-    });
-  });
-
   describe('merge', function () {
     it('should define missing options', function () {
-      const context = new HandlerContext({}, ['key', 'value', 'options'], ['foo', 'bar']);
+      const context = new HandlerContext({}, 'set', ['key', 'value', 'options'], ['foo', 'bar']);
 
       context.merge('options', { merge: false });
       expect(context.options).to.eql({ merge: false });
     });
     it('should merge existing options', function () {
-      const context = new HandlerContext({}, ['key', 'value', 'options'], ['foo', 'bar', { foo: true }]);
+      const context = new HandlerContext({}, 'set', ['key', 'value', 'options'], ['foo', 'bar', { foo: true }]);
 
       context.merge('options', { merge: false });
       expect(context.options).to.eql({ foo: true, merge: false });
@@ -827,12 +658,12 @@ describe('HandlerContext', function () {
 
   describe('toArguments', function () {
     it('should return args based on signature', function () {
-      const context = new HandlerContext({}, ['key', 'value'], ['foo', 'bar']);
+      const context = new HandlerContext({}, 'set', ['key', 'value'], ['foo', 'bar']);
 
       expect(context.toArguments()).to.eql(['foo', 'bar']);
     });
     it('should return args, including rest argument', function () {
-      const context = new HandlerContext({}, ['key', 'value', '...args'], ['foo', 'bar', true]);
+      const context = new HandlerContext({}, 'set', ['key', 'value', '...args'], ['foo', 'bar', true]);
 
       expect(context.toArguments()).to.eql(['foo', 'bar', true]);
     });
