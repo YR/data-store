@@ -19,42 +19,42 @@ store.get('foo/bar/bat'); //=> true
 #### `create (id: String, data: Object, options: Object): DataStore|FetchableDataStore` 
 Instance factory. Options include:
 
-- **`handlers: Array`** array of arrays (`[methodName: String, match: RegExp, handler: Function]`) for passing to `registerMethodHandler` [default: `null`]. See [handlers](#handlers)
+- **`handlers: Array`** array of arrays (`[match: RegExp, handler: Function]`) for passing to `use` [default: `null`]. See [handlers](#handlers)
 - **`isFetchable: Boolean`** specify whether instance should be a `FetchableDataStore` that supports data fetching [default: `false`]. See [FetchableDataStore](#fetchabledatastore)
 - **`isWritable: Boolean`** specify whether instance should be writable via `set()/update()` [default: `true`]
 - **`serialisableKeys: Object`** object listing keys and their serialisable state [default: `{}`]. See [`setSerialisabilityOfKey()`](#setserialisabilityofkey-key-stringobject-value-boolean)
 
 ### `DataStore`
 
-#### `registerMethodHandler (methodName: String|Array, match: RegExp, handler: Function)`
-Register a method handler for `methodName` (see [handlers](#handlers)):
+#### `use (match: RegExp|Array, handler: Function)`
+Register a middleware handler (see [handlers](#handlers)):
 
 ```js
-store.registerMethodHandler('get', /foo/, function (context) { /* */ });
+store.use(/foo/, function (context) { /* */ });
 ```
 
 Batch register handlers by passing an array of arrays:
 
 ```js
-store.registerMethodHandler([
-  ['get', /foo/, function (context) { /* */ }], 
-  ['set', /foo/, function (context) { /* */ }]
+store.use([
+  [/foo/, function (context) { /* */ }],
+  [/foo/, function (context) { /* */ }]
 ]);
 ```
 
-#### `unregisterMethodHandler (methodName: String|Array, match: RegExp, handler: Function)`
-Unregister a previously registerd method handler:
+#### `unuse (match: RegExp|Array, handler: Function)`
+Unregister a previously registerd middleware handler:
 
 ```js
-store.unregisterMethodHandler('get', /foo/, function (context) { /* */ });
+store.unuse(/foo/, function (context) { /* */ });
 ```
 
 Batch unregister handlers by passing an array of arrays:
 
 ```js
-store.unregisterMethodHandler([
-  ['get', /foo/, function (context) { /* */ }], 
-  ['set', /foo/, function (context) { /* */ }]
+store.unuse([
+  [/foo/, function (context) { /* */ }],
+  [/foo/, function (context) { /* */ }]
 ]);
 ```
 
@@ -97,15 +97,6 @@ Retrieve reference to value stored at `key`. If `key` is an array of strings, re
 ```js
 store.set('stuff', store.reference(['foo/bar/bat', 'bar']));
 store.get('stuff/0'); //=> true
-```
-
-#### `remove (key: String|Array)`
-Remove value stored at `key`. If `key` is an array of keys, batch removes values:
-
-```js
-store.remove(['foo', 'bar']);
-store.get('foo'); //=> undefined
-store.get('bar'); //=> undefined
 ```
 
 #### `reset (data: Object)`
@@ -211,47 +202,38 @@ console.log(childCursor.get('0') === store.get('foo/bar/boo/0')); //=> true
 
 ## Handlers
 
-In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a method and key (url path) with a handler function. In practive, this enables observation, delegation, middleware, and side effects for the following methods: 
+In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a key (url path) with a handler function. In practice, this enables observation, delegation, middleware, and side effects for the following methods:
 
 **`DataStore`**
-- `get`
 - `set`
-- `remove`
 - `reset`
 
 **`FetchableDataStore`**
 - `fetch`
 
-Handlers are registered with `DataStore.registerMethodHandler(methodName: String|Array, match: RegExp, handler: Function)`, and will route an operation (`methodName`), matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in series, and may optionally respond directly with a value (delegation), batch additional changes (observation), or trigger unrelated operations (side effects).
+Handlers are registered with `DataStore.use(match: RegExp|Array, handler: Function)`, and will route an operation matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in series.
 
-Matching is based on the `methodName` and a regular expression (`match`). If no `match` is specified (is `null` or `undefined`), or if the method does not accept a `key` (as is the case for `reset`), handlers are automatically matched and executed.
+Matching is based on an optional regular expression (`match`). If no `match` is specified (is `null` or `undefined`), or if the method does not accept a `key` (as is the case for `reset`), handlers are automatically matched and executed.
 
 ### `HandlerContext`
 
 Handler functions are passed a `HandlerContext` instance with the following properties:
+- **`method: String`** method type
 - **`store: DataStrore`** reference to current `DataStore` instance
 - **`signature: Array`** method arguments for handled method
 - **`key, value, options, etc`** argument values passed to handled method
 
 ```js
-store.registerMethodHandler('get', /foo/, function (context) {
+store.use(/foo/, function (context) {
   console.log(context.key); //=> 'foo/bar'
 });
-store.get('foo/bar');
+store.set('foo/bar', 'boo');
 ```
 
 In addition, the following helper methods are available:
-- **`batch(key: String|Object|Array, value: *)`** batch additional changes:
-```js
-store.registerMethodHandler('set', /boo/, function (context) {
-  context.batch('boo/bat', 'bat');
-});
-store.set('boo/bar', 'bar');
-store.get('boo'); //=> { bar: 'bar', bat: 'bat' }
-```
 - **`merge(propName: String, prop: Object)`** merge `prop` with `context[propName]`:
 ```js
-store.registerMethodHandler('set', /foo/, function (context) {
+store.use('set', /foo/, function (context) {
   context.merge('options', { merge: false })
 });
 store.set('foo/bat', 'bat');
