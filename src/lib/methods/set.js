@@ -33,6 +33,13 @@ module.exports = function set (store, key, value, options) {
       doSet(store, k, key[k], options);
     }
   }
+  if (Array.isArray(key)) {
+    for (let i = 0, n = key.length; i < n; i++) {
+      const [k, v, o = {}] = key[i];
+
+      doSet(store, k, v, assign({}, DEFAULT_OPTIONS, o));
+    }
+  }
 };
 
 /**

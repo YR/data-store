@@ -1,6 +1,7 @@
 'use strict';
 
 const agent = require('@yr/agent');
+const assign = require('object-assign');
 const get = require('./get');
 const isPlainObject = require('is-plain-obj');
 
@@ -26,6 +27,9 @@ module.exports = function fetch (store, key, url, options = {}) {
   if ('string' == typeof key) return doFetch(store, key, url, options);
   if (isPlainObject(key)) {
     return Promise.all(Object.keys(key).map((k) => doFetch(store, k, key[k], options)));
+  }
+  if (Array.isArray(key)) {
+    return Promise.all(key.map((args) => doFetch(store, ...args)));
   }
 };
 

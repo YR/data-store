@@ -1,5 +1,6 @@
 'use strict';
 
+const assign = require('object-assign');
 const clock = require('@yr/clock');
 const get = require('./get');
 const isPlainObject = require('is-plain-obj');
@@ -24,6 +25,13 @@ module.exports = function update (store, key, value, options, ...args) {
   if (isPlainObject(key)) {
     for (const k in key) {
       doUpdate(store, k, key[k], options, ...args);
+    }
+  }
+  if (Array.isArray(key)) {
+    for (let i = 0, n = key.length; i < n; i++) {
+      const [k, v, o = {}, ...args] = key[i];
+
+      doUpdate(store, k, v, o, ...args);
     }
   }
 };

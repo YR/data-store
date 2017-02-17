@@ -85,6 +85,14 @@ describe('DataStore', function () {
       expect(store._data.test).to.equal('success');
       expect(store._data.boop).to.have.property('bar', 'foo');
     });
+    it('should allow array batch writes', function () {
+      set(store, [
+        ['/test', 'success'],
+        ['boop/bar', 'foo']
+      ]);
+      expect(store._data.test).to.equal('success');
+      expect(store._data.boop).to.have.property('bar', 'foo');
+    });
     it('should update the original referenced value', function () {
       set(store, 'foo/boo/bar', 'bar');
       expect(store._data.boo.bar).to.equal('bar');
@@ -212,6 +220,11 @@ describe('DataStore', function () {
         expect(store.get('bar')).to.equal('bar');
         expect(store.get('foo')).to.equal('bar');
       });
+      it('should allow array batch writes', function () {
+        store.update([['bar', 'bar'], ['foo', 'bar']]);
+        expect(store.get('bar')).to.equal('bar');
+        expect(store.get('foo')).to.equal('bar');
+      });
       it('should notify listeners', function (done) {
         store.on('update', (key, value, oldValue) => {
           expect(key).to.equal('bar');
@@ -247,6 +260,17 @@ describe('DataStore', function () {
           if (++i == 2) done();
         });
         store.update(obj, null, null, 'foo');
+      });
+      it('should allow passing of additional arguments to listeners for array batch writes', function (done) {
+        const arr = [['bar', 'bar', null, 'foo'], ['boo', 'boo', null, 'bar']];
+        let i = 0;
+
+        store.on('update', (key, value, oldValue, options, extra) => {
+          if (key == 'bar') expect(extra).to.equal('foo');
+          if (key == 'boo') expect(extra).to.equal('bar');
+          if (++i == 2) done();
+        });
+        store.update(arr);
       });
       it('should be ignored if dataStore is not "isWritable"', function () {
         store.isWritable = false;
@@ -581,7 +605,7 @@ describe('FetchableDataStore', function () {
           expect(result.data).to.have.property('foo', 'foo');
         });
     });
-    it('should return a Promise for an array of keys when batch fetching', function () {
+    it('should return a Promise for batch fetching', function () {
       fake
         .get('/foo')
         .reply(200, { foo: 'foo' })
@@ -590,6 +614,23 @@ describe('FetchableDataStore', function () {
       set(store, { 'foo/__expires': 0, 'bar/__expires': 0 });
 
       return fetch(store, { foo: 'http://localhost/foo', bar: 'http://localhost/bar' }, { staleWhileRevalidate: false })
+        .then((results) => {
+          expect(results[0].data).to.have.property('foo', 'foo');
+          expect(results[1].data).to.have.property('bar', 'bar');
+        });
+    });
+    it('should return a Promise for array batch fetching', function () {
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' })
+        .get('/bar')
+        .reply(200, { bar: 'bar' });
+      set(store, { 'foo/__expires': 0, 'bar/__expires': 0 });
+
+      return fetch(store, [
+        ['foo', 'http://localhost/foo', { staleWhileRevalidate: false }],
+        ['bar', 'http://localhost/bar', { staleWhileRevalidate: false }]
+      ])
         .then((results) => {
           expect(results[0].data).to.have.property('foo', 'foo');
           expect(results[1].data).to.have.property('bar', 'bar');
