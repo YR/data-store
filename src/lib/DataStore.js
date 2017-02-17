@@ -136,6 +136,11 @@ module.exports = class DataStore extends Emitter {
         this._handledMethods.set(k, key[k], options);
       }
     }
+    if (Array.isArray(key)) {
+      for (let i = 0, n = key.length; i < n; i++) {
+        this._handledMethods.set(...key[i]);
+      }
+    }
   }
 
   /**

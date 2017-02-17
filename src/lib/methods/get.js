@@ -13,9 +13,7 @@ const property = require('@yr/property');
  */
 module.exports = function get (store, key) {
   if (!key) return store._data;
-
-  if ('string' == typeof key) return doGet(store, key);
-  if (Array.isArray(key)) return key.map((k) => doGet(store, k));
+  return doGet(store, key);
 };
 
 /**

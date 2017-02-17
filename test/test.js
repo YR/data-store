@@ -41,9 +41,6 @@ describe('DataStore', function () {
       expect(get(store, 'bar')).to.equal('bat');
       expect(get(store, '/bar')).to.equal('bat');
     });
-    it('should return an array of values for an array of string keys', function () {
-      expect(get(store, ['bar', 'bat'])).to.eql(['bat', ['foo', 'bar']]);
-    });
     it('should return all data if no key specified', function () {
       expect(get(store).bar).to.equal('bat');
     });
@@ -53,9 +50,6 @@ describe('DataStore', function () {
     });
     it('should return a referenced value when passed a reference key', function () {
       expect(get(store, '__ref:boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
-    });
-    it('should return an array of referenced values', function () {
-      expect(get(store, ['foo/boo/bar', 'foo/bat'])).to.eql(['foo', 'bat']);
     });
     it('should return a resolved object of referenced values', function () {
       expect(get(store, 'foo')).to.eql({ bar: 'foo', boo: { bar: 'foo', bat: { foo: 'foo' } }, bat: 'bat' });

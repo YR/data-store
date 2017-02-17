@@ -1,17 +1,11 @@
 'use strict';
 
 const agent = require('@yr/agent');
-const assign = require('object-assign');
 const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
 const isPlainObject = require('is-plain-obj');
 const runtime = require('@yr/runtime');
 
-const DEFAULT_LOAD_OPTIONS = {
-  minExpiry: 60000,
-  retry: 2,
-  timeout: 5000
-};
 const GRACE = 10000;
 const EXPIRES_KEY = '__expires';
 
@@ -53,13 +47,12 @@ module.exports = class FetchableDataStore extends DataStore {
    */
   fetch (key, url, options) {
     if (!key) return;
-
-    options = assign({}, DEFAULT_LOAD_OPTIONS, options);
-
     if ('string' == typeof key) return this._handledMethods.fetch(key, url, options);
-
     if (isPlainObject(key)) {
       return Promise.all(Object.keys(key).map((k) => this._handledMethods.fetch(k, key[k], options)));
+    }
+    if (Array.isArray(key)) {
+      return Promise.all(key.map((args) => this._handledMethods.fetch(...args)));
     }
   }
 

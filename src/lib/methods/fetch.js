@@ -5,6 +5,12 @@ const assign = require('object-assign');
 const get = require('./get');
 const isPlainObject = require('is-plain-obj');
 
+const DEFAULT_LOAD_OPTIONS = {
+  minExpiry: 60000,
+  retry: 2,
+  timeout: 5000
+};
+
 /**
  * Fetch data. If expired, load from 'url' and store at 'key'
  * Hash of 'key:url' pairs batches calls
@@ -21,15 +27,21 @@ const isPlainObject = require('is-plain-obj');
  *  - {Number} timeout
  * @returns {Promise}
  */
-module.exports = function fetch (store, key, url, options = {}) {
+module.exports = function fetch (store, key, url, options) {
   if (!key) return;
+
+  options = assign({}, DEFAULT_LOAD_OPTIONS, options);
 
   if ('string' == typeof key) return doFetch(store, key, url, options);
   if (isPlainObject(key)) {
     return Promise.all(Object.keys(key).map((k) => doFetch(store, k, key[k], options)));
   }
   if (Array.isArray(key)) {
-    return Promise.all(key.map((args) => doFetch(store, ...args)));
+    return Promise.all(key.map((args) => {
+      const [k, u, o = {}] = args;
+
+      return doFetch(store, k, u, assign({}, options, o));
+    }));
   }
 };
 
