@@ -75,7 +75,7 @@ function doFetch (store, key, url, options) {
           resolve({
             duration: res.duration,
             headers: res.headers,
-            data: get(store, key)
+            body: get(store, key)
           });
         })
         .catch((err) => {
@@ -84,7 +84,7 @@ function doFetch (store, key, url, options) {
             duration: 0,
             error: err,
             headers: { expires: (new Date(Date.now() + minExpiry)).toUTCString(), status: err.status },
-            data: value
+            body: value
           });
         });
     });
@@ -98,7 +98,7 @@ function doFetch (store, key, url, options) {
   return Promise.resolve({
     duration: 0,
     headers: { status: 200 },
-    data: value
+    body: value
   });
 }
 

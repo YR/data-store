@@ -577,7 +577,7 @@ describe('FetchableDataStore', function () {
     it('should return a Promise with the value', function () {
       return fetch(store, 'bar', null, {})
         .then((result) => {
-          expect(result.data).to.equal('bat');
+          expect(result.body).to.equal('bat');
         });
     });
     it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
@@ -585,7 +585,7 @@ describe('FetchableDataStore', function () {
 
       return fetch(store, 'foo', 'http://localhost/foo', { staleWhileRevalidate: true })
         .then((result) => {
-          expect(result.data).to.not.have.property('foo');
+          expect(result.body).to.not.have.property('foo');
         });
     });
     it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', function () {
@@ -596,7 +596,7 @@ describe('FetchableDataStore', function () {
 
       return fetch(store, 'foo', 'http://localhost/foo', { staleWhileRevalidate: false })
         .then((result) => {
-          expect(result.data).to.have.property('foo', 'foo');
+          expect(result.body).to.have.property('foo', 'foo');
         });
     });
     it('should return a Promise for batch fetching', function () {
@@ -609,8 +609,8 @@ describe('FetchableDataStore', function () {
 
       return fetch(store, { foo: 'http://localhost/foo', bar: 'http://localhost/bar' }, { staleWhileRevalidate: false })
         .then((results) => {
-          expect(results[0].data).to.have.property('foo', 'foo');
-          expect(results[1].data).to.have.property('bar', 'bar');
+          expect(results[0].body).to.have.property('foo', 'foo');
+          expect(results[1].body).to.have.property('bar', 'bar');
         });
     });
     it('should return a Promise for array batch fetching', function () {
@@ -626,8 +626,8 @@ describe('FetchableDataStore', function () {
         ['bar', 'http://localhost/bar', { staleWhileRevalidate: false }]
       ])
         .then((results) => {
-          expect(results[0].data).to.have.property('foo', 'foo');
-          expect(results[1].data).to.have.property('bar', 'bar');
+          expect(results[0].body).to.have.property('foo', 'foo');
+          expect(results[1].body).to.have.property('bar', 'bar');
         });
     });
     it('should return a Promise when failure loading', function () {
@@ -640,7 +640,7 @@ describe('FetchableDataStore', function () {
           throw Error('should be error');
         })
         .catch((err) => {
-          expect(err.data).to.equal(undefined);
+          expect(err.body).to.equal(undefined);
           expect(err.status).to.equal(500);
         });
     });

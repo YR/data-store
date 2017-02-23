@@ -133,7 +133,7 @@ Retrieve value stored at `key`. If `key` is a hash of `key:url` pairs, batch fet
 store
   .fetch('beep', 'http://localhost/beep')
   .then((result) => {
-    console.log(result); //=> { duration: 1000, headers: {/* */}, data: { beep: 'foo' } }
+    console.log(result); //=> { duration: 1000, headers: {/* */}, body: { beep: 'foo' } }
     store.get('beep'); //=> { beep: 'foo' }
   });
 ```
@@ -141,7 +141,7 @@ store
 The returned Promise resolves with a `result` object:
 - **`duration: Number`** load time in ms
 - **`headers: Object`** the parsed response headers
-- **`data: Object`** the parsed JSON body
+- **`body: Object`** the response body
 
 Options include:
 - **`abort: Boolean`** abort existing (outstanding) request to same url [default: `false`]
