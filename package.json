@@ -7,7 +7,7 @@
     "@yr/agent": "5.0.x",
     "@yr/clock": "1.1.x",
     "@yr/keys": "1.1.x",
-    "@yr/property": "5.2.x",
+    "@yr/property": "6.0.x",
     "@yr/runtime": "2.0.x",
     "@yr/url-utils": "2.3.x",
     "debug": "2.6.x",

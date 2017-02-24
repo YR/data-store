@@ -356,7 +356,7 @@ describe('DataStore', function () {
           const cursor = store.createCursor('foo');
 
           cursor.update();
-          expect(store.get('foo/bar')).to.equal(null);
+          expect(store.get('foo/bar')).to.equal(undefined);
           expect(store._data).to.not.have.property('foo');
         });
         it('should allow batch writes', function () {
