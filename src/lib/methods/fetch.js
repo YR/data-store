@@ -28,7 +28,13 @@ const DEFAULT_LOAD_OPTIONS = {
  * @returns {Promise}
  */
 module.exports = function fetch (store, key, url, options) {
-  if (!key) return;
+  if (!key) {
+    return Promise.resolve({
+      duration: 0,
+      headers: { status: 500 },
+      body: undefined
+    });
+  }
 
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
 
@@ -71,6 +77,14 @@ function doFetch (store, key, url, options) {
 
   // Load if missing or expired
   if (isMissingOrExpired) {
+    if (!url) {
+      return Promise.resolve({
+        duration: 0,
+        headers: { status: 500 },
+        body: value
+      });
+    }
+
     store.debug('fetch %s from %s', key, url);
 
     const promiseToLoad = new Promise((resolve, reject) => {

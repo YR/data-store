@@ -573,8 +573,14 @@ describe('FetchableDataStore', function () {
       nock.cleanAll();
     });
 
+    it('should return a Promise without the value if missing "key"', function () {
+      return store.fetch(null, 'bar', {})
+        .then((result) => {
+          expect(result.body).to.equal(undefined);
+        });
+    });
     it('should return a Promise with the value', function () {
-      return store.fetch('bar', null, {})
+      return store.fetch('bar', 'bar', {})
         .then((result) => {
           expect(result.body).to.equal('bat');
         });
