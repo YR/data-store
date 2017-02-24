@@ -3,7 +3,6 @@
 const { create: createStore } = require('../src/index');
 const agent = require('@yr/agent');
 const expect = require('expect.js');
-const fetch = require('../src/lib/methods/fetch');
 const get = require('../src/lib/methods/get');
 const HandlerContext = require('../src/lib/HandlerContext');
 const nock = require('nock');
@@ -575,7 +574,7 @@ describe('FetchableDataStore', function () {
     });
 
     it('should return a Promise with the value', function () {
-      return fetch(store, 'bar', null, {})
+      return store.fetch('bar', null, {})
         .then((result) => {
           expect(result.body).to.equal('bat');
         });
@@ -583,7 +582,7 @@ describe('FetchableDataStore', function () {
     it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
       set(store, 'foo/__expires', 0);
 
-      return fetch(store, 'foo', 'http://localhost/foo', { staleWhileRevalidate: true })
+      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true })
         .then((result) => {
           expect(result.body).to.not.have.property('foo');
         });
@@ -594,7 +593,7 @@ describe('FetchableDataStore', function () {
         .reply(200, { foo: 'foo' });
       set(store, 'foo/__expires', 0);
 
-      return fetch(store, 'foo', 'http://localhost/foo', { staleWhileRevalidate: false })
+      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false })
         .then((result) => {
           expect(result.body).to.have.property('foo', 'foo');
         });
@@ -607,7 +606,7 @@ describe('FetchableDataStore', function () {
         .reply(200, { bar: 'bar' });
       set(store, { 'foo/__expires': 0, 'bar/__expires': 0 });
 
-      return fetch(store, { foo: 'http://localhost/foo', bar: 'http://localhost/bar' }, { staleWhileRevalidate: false })
+      return store.fetch({ foo: 'http://localhost/foo', bar: 'http://localhost/bar' }, { staleWhileRevalidate: false })
         .then((results) => {
           expect(results[0].body).to.have.property('foo', 'foo');
           expect(results[1].body).to.have.property('bar', 'bar');
@@ -621,7 +620,7 @@ describe('FetchableDataStore', function () {
         .reply(200, { bar: 'bar' });
       set(store, { 'foo/__expires': 0, 'bar/__expires': 0 });
 
-      return fetch(store, [
+      return store.fetch([
         ['foo', 'http://localhost/foo', { staleWhileRevalidate: false }],
         ['bar', 'http://localhost/bar', { staleWhileRevalidate: false }]
       ])
@@ -635,7 +634,7 @@ describe('FetchableDataStore', function () {
         .get('/beep')
         .replyWithError('oops');
 
-      return fetch(store, 'beep', 'http://localhost/beep', { retries: 0, timeout: 100 })
+      return store.fetch('beep', 'http://localhost/beep', { retries: 0, timeout: 100 })
         .then((results) => {
           throw Error('should be error');
         })
@@ -650,7 +649,7 @@ describe('FetchableDataStore', function () {
         .delayConnection(50)
         .reply(200, { beep: 'beep' });
 
-      fetch(store, 'beep', 'http://localhost/beep', { retries: 0, timeout: 10 })
+      store.fetch('beep', 'http://localhost/beep', { retries: 0, timeout: 10 })
         .then(done)
         .catch(done);
       agent.abortAll();

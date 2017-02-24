@@ -34,7 +34,11 @@ module.exports = function fetch (store, key, url, options) {
 
   if ('string' == typeof key) return doFetch(store, key, url, options);
   if (isPlainObject(key)) {
-    return Promise.all(Object.keys(key).map((k) => doFetch(store, k, key[k], options)));
+    return Promise.all(
+      Object.keys(key)
+        .sort()
+        .map((k) => doFetch(store, k, key[k], options))
+    );
   }
   if (Array.isArray(key)) {
     return Promise.all(key.map((args) => {
