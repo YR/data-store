@@ -608,8 +608,8 @@ describe('FetchableDataStore', function () {
 
       return store.fetch({ foo: 'http://localhost/foo', bar: 'http://localhost/bar' }, { staleWhileRevalidate: false })
         .then((results) => {
-          expect(results[0].body).to.have.property('foo', 'foo');
-          expect(results[1].body).to.have.property('bar', 'bar');
+          expect(results[0].body).to.have.property('bar', 'bar');
+          expect(results[1].body).to.have.property('foo', 'foo');
         });
     });
     it('should return a Promise for array batch fetching', function () {

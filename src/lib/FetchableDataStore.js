@@ -49,7 +49,11 @@ module.exports = class FetchableDataStore extends DataStore {
     if (!key) return;
     if ('string' == typeof key) return this._handledMethods.fetch(key, url, options);
     if (isPlainObject(key)) {
-      return Promise.all(Object.keys(key).map((k) => this._handledMethods.fetch(k, key[k], options)));
+      return Promise.all(
+        Object.keys(key)
+          .sort()
+          .map((k) => this._handledMethods.fetch(k, key[k], options))
+      );
     }
     if (Array.isArray(key)) {
       return Promise.all(key.map((args) => this._handledMethods.fetch(...args)));
