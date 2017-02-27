@@ -604,6 +604,27 @@ describe('FetchableDataStore', function () {
           expect(result.body).to.have.property('foo', 'foo');
         });
     });
+    it('should return a Promise with expired value when "options.staleIfError = true" and value', function () {
+      fake
+        .get('/foo')
+        .reply(500);
+      set(store, 'foo/__expires', 0);
+
+      return store.fetch('foo', 'http://localhost/foo', { staleIfError: true })
+        .then((result) => {
+          expect(result.body).to.have.property('bar', 'boo');
+        });
+    });
+    it('should return a rejected Promise when "options.staleIfError = false" and no value', function () {
+      fake
+        .get('/zoop')
+        .reply(500);
+
+      return store.fetch('zoop', 'http://localhost/zoop', { staleIfError: true })
+        .catch((err) => {
+          expect(err).to.have.property('status', 500);
+        });
+    });
     it('should return a Promise for batch fetching', function () {
       fake
         .get('/foo')

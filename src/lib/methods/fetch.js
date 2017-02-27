@@ -100,7 +100,7 @@ function doFetch (store, key, url, options) {
           });
         })
         .catch((err) => {
-          if (!staleIfError) return reject(err);
+          if (!(value && staleIfError)) return reject(err);
           resolve({
             body: value,
             duration: 0,
