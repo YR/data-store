@@ -30,9 +30,10 @@ const DEFAULT_LOAD_OPTIONS = {
 module.exports = function fetch (store, key, url, options) {
   if (!key) {
     return Promise.resolve({
+      body: undefined,
       duration: 0,
       headers: { status: 500 },
-      body: undefined
+      key
     });
   }
 
@@ -79,9 +80,10 @@ function doFetch (store, key, url, options) {
   if (isMissingOrExpired) {
     if (!url) {
       return Promise.resolve({
+        body: value,
         duration: 0,
         headers: { status: 500 },
-        body: value
+        key
       });
     }
 
@@ -91,18 +93,20 @@ function doFetch (store, key, url, options) {
       load(store, key, url, options)
         .then((res) => {
           resolve({
+            body: get(store, key),
             duration: res.duration,
             headers: res.headers,
-            body: get(store, key)
+            key
           });
         })
         .catch((err) => {
           if (!staleIfError) return reject(err);
           resolve({
+            body: value,
             duration: 0,
             error: err,
             headers: { expires: (new Date(Date.now() + minExpiry)).toUTCString(), status: err.status },
-            body: value
+            key
           });
         });
     });
@@ -114,9 +118,10 @@ function doFetch (store, key, url, options) {
 
   // Return data (possibly stale)
   return Promise.resolve({
+    body: value,
     duration: 0,
     headers: { status: 200 },
-    body: value
+    key
   });
 }
 

@@ -48,9 +48,10 @@ module.exports = class FetchableDataStore extends DataStore {
   fetch (key, url, options) {
     if (!key) {
       return Promise.resolve({
+        body: undefined,
         duration: 0,
         headers: { status: 500 },
-        body: undefined
+        key
       });
     }
 

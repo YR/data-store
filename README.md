@@ -139,9 +139,10 @@ store
 ```
 
 The returned Promise resolves with a `result` object:
+- **`body: Object`** the response body
 - **`duration: Number`** load time in ms
 - **`headers: Object`** the parsed response headers
-- **`body: Object`** the response body
+- **`key: String`** the key used to store the response data
 
 Options include:
 - **`abort: Boolean`** abort existing (outstanding) request to same url [default: `false`]
