@@ -150,7 +150,7 @@ Options include:
 - **`minExpiry: Number`** the minimum expiry (in ms) to use in cases of invalid `expires` [default: `60000`]
 - **`retries: Number`** the number of times to retry load on error [default: `2`]
 - **`staleWhileRevalidate: Boolean`** specify whether to resolve returned promise with stale value or wait for loaded [default: `false`]
-- **`staleIfError: Boolean`** specify whether to resolve returned promise with stale value or `null` after load error [default: `false`]
+- **`staleIfError: Boolean`** specify whether to resolve returned promise with stale value or reject after load error [default: `false`]
 - **`timeout: Number`** the timeout duration (in ms) before attempting retry [default: `5000`]
 
 #### `abort (key: String|Array)`

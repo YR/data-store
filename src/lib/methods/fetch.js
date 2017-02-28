@@ -100,7 +100,7 @@ function doFetch (store, key, url, options) {
           });
         })
         .catch((err) => {
-          if (!(value && staleIfError)) return reject(err);
+          if (!staleIfError) return reject(err);
           resolve({
             body: value,
             duration: 0,
@@ -134,20 +134,22 @@ function doFetch (store, key, url, options) {
  *  - {Boolean} abort
  *  - {Boolean} ignoreQuery
  *  - {Number} minExpiry
- *  - {Number} retries
+ *  - {Number} retry
  *  - {Boolean} staleIfError
  *  - {Number} timeout
  * @returns {Promise}
  */
 function load (store, key, url, options) {
+  const { minExpiry, retry, staleIfError, timeout } = options;
+
   options.id = key;
 
   store.debug('load %s from %s', key, url);
 
   return agent
     .get(url, options)
-    .timeout(options.timeout)
-    .retry(options.retries)
+    .timeout(timeout)
+    .retry(retry)
     .then((res) => {
       store.debug('loaded "%s" in %dms', key, res.duration);
 
@@ -157,7 +159,7 @@ function load (store, key, url, options) {
 
         // Add expires header
         if (res.headers && 'expires' in res.headers) {
-          data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, options.minExpiry, store.GRACE);
+          data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, minExpiry, store.GRACE);
         }
 
         // Enable handling by not calling inner set()
@@ -169,7 +171,7 @@ function load (store, key, url, options) {
     .catch((err) => {
       store.debug('unable to load "%s" from %s', key, url);
 
-      if (!options.staleIfError) store.set(key, null, options);
+      if (!staleIfError) store.set(key, undefined, options);
 
       throw err;
     });

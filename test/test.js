@@ -607,21 +607,55 @@ describe('FetchableDataStore', function () {
     it('should return a Promise with expired value when "options.staleIfError = true" and value', function () {
       fake
         .get('/foo')
-        .reply(500);
+        .replyWithError(500);
       set(store, 'foo/__expires', 0);
 
       return store.fetch('foo', 'http://localhost/foo', { staleIfError: true })
         .then((result) => {
+          expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' }, __expires: 0 });
           expect(result.body).to.have.property('bar', 'boo');
         });
     });
-    it('should return a rejected Promise when "options.staleIfError = false" and no value', function () {
+    it('should return a rejected Promise when failure loading', function () {
+      fake
+        .get('/beep')
+        .replyWithError('oops');
+
+      return store.fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 100 })
+        .then((results) => {
+          throw Error('expected an error');
+        })
+        .catch((err) => {
+          expect(err.body).to.equal(undefined);
+          expect(err.status).to.equal(500);
+        });
+    });
+    it('should return a rejected Promise when "options.staleIfError = false" and existing value', function () {
+      fake
+        .get('/foo')
+        .replyWithError(500);
+      set(store, 'foo/__expires', 0);
+
+      return store.fetch('foo', 'http://localhost/foo', { staleIfError: false })
+        .then((result) => {
+          throw Error('expected an error');
+        })
+        .catch((err) => {
+          expect(store.get('foo')).to.equal(undefined);
+          expect(err).to.have.property('status', 500);
+        });
+    });
+    it('should return a rejected Promise when "options.staleIfError = false" and no existing value', function () {
       fake
         .get('/zoop')
-        .reply(500);
+        .replyWithError(500);
 
-      return store.fetch('zoop', 'http://localhost/zoop', { staleIfError: true })
+      return store.fetch('zoop', 'http://localhost/zoop', { staleIfError: false })
+        .then((result) => {
+          throw Error('expected an error');
+        })
         .catch((err) => {
+          expect(store.get('zoop')).to.equal(undefined);
           expect(err).to.have.property('status', 500);
         });
     });
@@ -656,27 +690,13 @@ describe('FetchableDataStore', function () {
           expect(results[1].body).to.have.property('bar', 'bar');
         });
     });
-    it('should return a Promise when failure loading', function () {
-      fake
-        .get('/beep')
-        .replyWithError('oops');
-
-      return store.fetch('beep', 'http://localhost/beep', { retries: 0, timeout: 100 })
-        .then((results) => {
-          throw Error('should be error');
-        })
-        .catch((err) => {
-          expect(err.body).to.equal(undefined);
-          expect(err.status).to.equal(500);
-        });
-    });
     it('should do nothing when loading aborted', function (done) {
       fake
         .get('/beep')
         .delayConnection(50)
         .reply(200, { beep: 'beep' });
 
-      store.fetch('beep', 'http://localhost/beep', { retries: 0, timeout: 10 })
+      store.fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
         .then(done)
         .catch(done);
       agent.abortAll();
