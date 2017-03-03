@@ -20,9 +20,9 @@
   version "1.1.3"
   resolved "https://registry.yarnpkg.com/@yr/keys/-/keys-1.1.3.tgz#0d5060a5ba77f78fbdfe8670ee9bd54a9cf26713"
 
-"@yr/property@6.0.x":
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/@yr/property/-/property-6.0.0.tgz#05254dee3493ab6687dd9aa9f4a35b378b2f01cf"
+"@yr/property@7.0.x":
+  version "7.0.0"
+  resolved "https://registry.yarnpkg.com/@yr/property/-/property-7.0.0.tgz#e0deb654a234d45a5659343e4afe5175ae59df99"
   dependencies:
     deep-freeze "0.0.1"
     is-plain-obj "1.1.x"
@@ -157,12 +157,12 @@ asynckit@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/asynckit/-/asynckit-0.4.0.tgz#c79ed97f7f34cb8f2ba1bc9790bcc366474b4b79"
 
-autoprefixer@6.7.5, autoprefixer@^6.3.1:
-  version "6.7.5"
-  resolved "https://registry.yarnpkg.com/autoprefixer/-/autoprefixer-6.7.5.tgz#50848f39dc08730091d9495023487e7cc21f518d"
+autoprefixer@6.7.6, autoprefixer@^6.3.1:
+  version "6.7.6"
+  resolved "https://registry.yarnpkg.com/autoprefixer/-/autoprefixer-6.7.6.tgz#00f05656c7ef73de9d2fd9b4668f6ef6905a855a"
   dependencies:
     browserslist "^1.7.5"
-    caniuse-db "^1.0.30000624"
+    caniuse-db "^1.0.30000628"
     normalize-range "^0.1.2"
     num2fraction "^1.2.2"
     postcss "^5.2.15"
@@ -689,11 +689,11 @@ buddy-cli@6.1.0:
     signal-exit "3.0.1"
 
 buddy@6.x.x:
-  version "6.12.5"
-  resolved "https://registry.yarnpkg.com/buddy/-/buddy-6.12.5.tgz#d22712791451743659f2d73b2bb70883e4d6731d"
+  version "6.12.6"
+  resolved "https://registry.yarnpkg.com/buddy/-/buddy-6.12.6.tgz#06e702b89960cc2225b69d7b211e6ce8f9be443d"
   dependencies:
     async "2.1.5"
-    autoprefixer "6.7.5"
+    autoprefixer "6.7.6"
     babel-core "6.23.1"
     babel-plugin-external-helpers "6.22.0"
     babel-plugin-minify-dead-code-elimination "0.1.3"
@@ -713,7 +713,7 @@ buddy@6.x.x:
     pretty-bytes "4.0.2"
     recur-fs "2.2.4"
     source-map "0.5.6"
-    uglify-js "2.7.5"
+    uglify-js "2.8.2"
 
 buffer-shims@^1.0.0:
   version "1.0.0"
@@ -732,9 +732,9 @@ caniuse-api@^1.5.2:
     lodash.memoize "^4.1.0"
     lodash.uniq "^4.3.0"
 
-caniuse-db@^1.0.30000346, caniuse-db@^1.0.30000624:
-  version "1.0.30000628"
-  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000628.tgz#3d010e2a8e2537a8d135792e90e4f2ce0eb838cc"
+caniuse-db@^1.0.30000346, caniuse-db@^1.0.30000624, caniuse-db@^1.0.30000628:
+  version "1.0.30000631"
+  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000631.tgz#8aa6f65cff452c4aba1c2aaa1e724102fbb9114f"
 
 caseless@~0.11.0:
   version "0.11.0"
@@ -1043,8 +1043,8 @@ ecc-jsbn@~0.1.1:
     jsbn "~0.1.0"
 
 electron-to-chromium@^1.2.3:
-  version "1.2.4"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.2.4.tgz#9751cbea89fa120bf88c226ba41eb8d0b6f1b597"
+  version "1.2.5"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.2.5.tgz#d373727228843dfd8466c276089f13b40927a952"
 
 entities@^1.1.1, entities@~1.1.1:
   version "1.1.1"
@@ -1115,8 +1115,8 @@ flatten@^1.0.2:
   resolved "https://registry.yarnpkg.com/flatten/-/flatten-1.0.2.tgz#dae46a9d78fbe25292258cc1e780a41d95c03782"
 
 for-in@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/for-in/-/for-in-1.0.1.tgz#d6c3e3798ceaaa301047b109dedf1b1ae37a0efa"
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/for-in/-/for-in-1.0.2.tgz#81068d295a8142ec0ac726c6e2200c30fb6d5e80"
 
 for-own@^0.1.4:
   version "0.1.5"
@@ -1727,8 +1727,8 @@ nan@^2.3.0:
   resolved "https://registry.yarnpkg.com/nan/-/nan-2.5.1.tgz#d5b01691253326a97a2bbee9e61c55d8d60351e2"
 
 nock@*:
-  version "9.0.7"
-  resolved "https://registry.yarnpkg.com/nock/-/nock-9.0.7.tgz#cc93481bb15f38bec2a39c4442be07825235b1a1"
+  version "9.0.9"
+  resolved "https://registry.yarnpkg.com/nock/-/nock-9.0.9.tgz#ca4cd923352e206ae3c7d6595cfd7fb223299ec0"
   dependencies:
     chai ">=1.9.2 <4.0.0"
     debug "^2.2.0"
@@ -2332,8 +2332,8 @@ sprintf-js@~1.0.2:
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
 
 sshpk@^1.7.0:
-  version "1.10.2"
-  resolved "https://registry.yarnpkg.com/sshpk/-/sshpk-1.10.2.tgz#d5a804ce22695515638e798dbe23273de070a5fa"
+  version "1.11.0"
+  resolved "https://registry.yarnpkg.com/sshpk/-/sshpk-1.11.0.tgz#2d8d5ebb4a6fab28ffba37fa62a90f4a3ea59d77"
   dependencies:
     asn1 "~0.2.3"
     assert-plus "^1.0.0"
@@ -2470,9 +2470,18 @@ type-detect@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/type-detect/-/type-detect-1.0.0.tgz#762217cc06db258ec48908a1298e8b95121e8ea2"
 
-uglify-js@2.7.5, uglify-js@2.7.x:
+uglify-js@2.7.x:
   version "2.7.5"
   resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-2.7.5.tgz#4612c0c7baaee2ba7c487de4904ae122079f2ca8"
+  dependencies:
+    async "~0.2.6"
+    source-map "~0.5.1"
+    uglify-to-browserify "~1.0.0"
+    yargs "~3.10.0"
+
+uglify-js@2.8.2:
+  version "2.8.2"
+  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-2.8.2.tgz#8a19429c5c9a7f096d1d04c460b132603231bb2a"
   dependencies:
     async "~0.2.6"
     source-map "~0.5.1"
