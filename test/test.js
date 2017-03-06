@@ -456,6 +456,18 @@ describe('DataStore', function () {
     });
 
     describe('handling', function () {
+      it('should ignore invalid handlers', function () {
+        store.use();
+        store.use(true);
+        store.use(false);
+        store.use(null);
+        store.use(undefined);
+        store.use('foo', true);
+        store.use('foo', false);
+        store.use('foo', null);
+        store.use('foo', undefined);
+        expect(store._handlers).to.eql([]);
+      });
       it('should allow middleware', function () {
         let run = 0;
 
