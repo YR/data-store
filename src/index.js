@@ -22,7 +22,7 @@ module.exports = {
    *  - {Object} serialisableKeys
    * @returns {DataStore}
    */
-  create (id, data, options) {
+  create(id, data, options) {
     if (options && options.isFetchable) {
       return new FetchableDataStore(id, data, options);
     }

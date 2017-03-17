@@ -2,7 +2,7 @@
 
 const assign = require('object-assign');
 const Cursor = require('./DataStoreCursor');
-const Debug = require('debug');
+const debugFactory = require('debug');
 const Emitter = require('eventemitter3');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
@@ -29,12 +29,12 @@ module.exports = class DataStore extends Emitter {
    *  - {Boolean} isWritable
    *  - {Object} serialisableKeys
    */
-  constructor (id, data, options = {}) {
+  constructor(id, data, options = {}) {
     super();
 
     this.REF_KEY = REF_KEY;
 
-    this.debug = Debug('yr:data' + (id ? ':' + id : ''));
+    this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
     this.isWritable = 'isWritable' in options ? options.isWritable : true;
@@ -53,7 +53,9 @@ module.exports = class DataStore extends Emitter {
     for (const methodName in handledMethods) {
       this._registerHandledMethod(methodName, ...handledMethods[methodName]);
     }
-    if (options.handlers) this.use(options.handlers);
+    if (options.handlers) {
+      this.use(options.handlers);
+    }
 
     this.reset(data || {});
   }
@@ -64,15 +66,13 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String|Array} [match]
    * @param {Function} handler
    */
-  use (match, handler) {
-    const matches = !Array.isArray(match)
-      ? [[match, handler]]
-      : match;
+  use(match, handler) {
+    const matches = !Array.isArray(match) ? [[match, handler]] : match;
 
     const handlers = this._handlers.map(({ handler }) => handler);
 
     matches.forEach(([match, handler]) => {
-      if ('function' == typeof match) {
+      if (typeof match === 'function') {
         handler = match;
         match = '';
       }
@@ -87,16 +87,16 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String|Array} [match]
    * @param {Function} handler
    */
-  unuse (match, handler) {
-    const matches = !Array.isArray(match)
-      ? [[match, handler]]
-      : match;
+  unuse(match, handler) {
+    const matches = !Array.isArray(match) ? [[match, handler]] : match;
 
     for (let i = 0, n = matches.length; i < n; i++) {
       let [match, handler] = matches[i];
       let j = this._handlers.length;
 
-      if ('function' == typeof match) handler = match;
+      if (typeof match === 'function') {
+        handler = match;
+      }
 
       while (--j >= 0) {
         if (this._handlers[j].handler === handler) {
@@ -113,9 +113,13 @@ module.exports = class DataStore extends Emitter {
    * @param {String|Array} [key]
    * @returns {*}
    */
-  get (key) {
-    if (!key || 'string' == typeof key) return get(this, key);
-    if (Array.isArray(key)) return key.map((k) => get(this, k));
+  get(key) {
+    if (!key || typeof key === 'string') {
+      return get(this, key);
+    }
+    if (Array.isArray(key)) {
+      return key.map(k => get(this, k));
+    }
   }
 
   /**
@@ -128,9 +132,13 @@ module.exports = class DataStore extends Emitter {
    *  - {Boolean} merge
    * @returns {null}
    */
-  set (key, value, options) {
-    if (!this.isWritable || !key) return;
-    if ('string' == typeof key) return this._handledMethods.set(key, value, options);
+  set(key, value, options) {
+    if (!this.isWritable || !key) {
+      return;
+    }
+    if (typeof key === 'string') {
+      return this._handledMethods.set(key, value, options);
+    }
     if (isPlainObject(key)) {
       for (const k in key) {
         this._handledMethods.set(k, key[k], options);
@@ -152,8 +160,10 @@ module.exports = class DataStore extends Emitter {
    * @param {Object} [options]
    *  - {Boolean} merge
    */
-  update (key, value, options, ...args) {
-    if (!this.isWritable || !key) return;
+  update(key, value, options, ...args) {
+    if (!this.isWritable || !key) {
+      return;
+    }
     update(this, key, value, options, ...args);
   }
 
@@ -163,23 +173,27 @@ module.exports = class DataStore extends Emitter {
    * @param {String|Array} [key]
    * @returns {String|Array}
    */
-  reference (key) {
-    if (!key || 'string' == typeof key) return reference(this, key);
-    if (Array.isArray(key)) return key.map((k) => reference(this, k));
+  reference(key) {
+    if (!key || typeof key === 'string') {
+      return reference(this, key);
+    }
+    if (Array.isArray(key)) {
+      return key.map(k => reference(this, k));
+    }
   }
 
   /**
    * Reset underlying 'data'
    * @param {Object} data
    */
-  reset (data) {
+  reset(data) {
     this._handledMethods.reset(data);
   }
 
   /**
    * Destroy instance
    */
-  destroy () {
+  destroy() {
     // Destroy cursors
     for (const key in this._cursors) {
       this._cursors[key].destroy();
@@ -198,10 +212,12 @@ module.exports = class DataStore extends Emitter {
    * @param {String} key
    * @returns {DataStore}
    */
-  createCursor (key) {
+  createCursor(key) {
     key = this._resolveRefKey(key || '');
     // Prefix all keys with separator
-    if (key && key.charAt(0) != '/') key = `/${key}`;
+    if (key && key.charAt(0) !== '/') {
+      key = `/${key}`;
+    }
 
     let cursor = this._cursors[key];
 
@@ -219,7 +235,7 @@ module.exports = class DataStore extends Emitter {
    * @param {String|Object} key
    * @param {Boolean} value
    */
-  setSerialisabilityOfKey (key, value) {
+  setSerialisabilityOfKey(key, value) {
     // Handle batch
     if (isPlainObject(key)) {
       for (const k in key) {
@@ -228,7 +244,9 @@ module.exports = class DataStore extends Emitter {
       return;
     }
 
-    if (key.charAt(0) == '/') key = key.slice(1);
+    if (key.charAt(0) === '/') {
+      key = key.slice(1);
+    }
 
     this._serialisableKeys[key] = value;
   }
@@ -238,7 +256,7 @@ module.exports = class DataStore extends Emitter {
    * @param {Boolean} stringify
    * @returns {Object|String}
    */
-  dump (stringify) {
+  dump(stringify) {
     const data = explode(this, this._data);
 
     if (stringify) {
@@ -258,8 +276,10 @@ module.exports = class DataStore extends Emitter {
    * @param {String} [key]
    * @returns {Object}
    */
-  toJSON (key) {
-    if (key) return serialise(key, get(this, key), this._serialisableKeys);
+  toJSON(key) {
+    if (key) {
+      return serialise(key, get(this, key), this._serialisableKeys);
+    }
     return serialise(null, this._data, this._serialisableKeys);
   }
 
@@ -269,11 +289,17 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String} match
    * @returns {Boolean}
    */
-  _isMatchKey (key, match) {
+  _isMatchKey(key, match) {
     // Treat no match as match all
-    if (!match) return true;
-    if (match instanceof RegExp) return match.test(key);
-    if ('string' == typeof match) return key.indexOf(match) == 0;
+    if (!match) {
+      return true;
+    }
+    if (match instanceof RegExp) {
+      return match.test(key);
+    }
+    if (typeof match === 'string') {
+      return key.indexOf(match) === 0;
+    }
     return false;
   }
 
@@ -282,9 +308,11 @@ module.exports = class DataStore extends Emitter {
    * @param {String} value
    * @returns {Boolean}
    */
-  _isRefValue (value) {
-    if (!value) return false;
-    return ('string' == typeof value && value.indexOf(REF_KEY) == 0);
+  _isRefValue(value) {
+    if (!value) {
+      return false;
+    }
+    return typeof value === 'string' && value.indexOf(REF_KEY) === 0;
   }
 
   /**
@@ -292,8 +320,10 @@ module.exports = class DataStore extends Emitter {
    * @param {String} ref
    * @returns {String}
    */
-  _parseRefKey (ref) {
-    if ('string' != typeof ref) return ref;
+  _parseRefKey(ref) {
+    if (typeof ref !== 'string') {
+      return ref;
+    }
     return ref.slice(REF_KEY.length);
   }
 
@@ -302,11 +332,15 @@ module.exports = class DataStore extends Emitter {
    * @param {String} key
    * @returns {String}
    */
-  _resolveRefKey (key) {
+  _resolveRefKey(key) {
     // Handle passing of __ref key
-    if (this._isRefValue(key)) return this._parseRefKey(key);
+    if (this._isRefValue(key)) {
+      return this._parseRefKey(key);
+    }
     // Trim leading '/' (cursors)
-    if (key.charAt(0) == '/') key = key.slice(1);
+    if (key.charAt(0) === '/') {
+      key = key.slice(1);
+    }
 
     const segs = key.split('/');
     const n = segs.length;
@@ -316,7 +350,9 @@ module.exports = class DataStore extends Emitter {
 
     // Walk data tree from root looking for nearest __ref
     while (idx < n) {
-      if (value[segs[idx]] == null) break;
+      if (value[segs[idx]] == null) {
+        break;
+      }
       value = value[segs[idx]];
       if (this._isRefValue(value)) {
         ref = this._parseRefKey(value);
@@ -326,7 +362,7 @@ module.exports = class DataStore extends Emitter {
     }
 
     // Append relative keys
-    if (ref != key && idx < n - 1) {
+    if (ref !== key && idx < n - 1) {
       ref += `/${segs.slice(idx + 1).join('/')}`;
     }
 
@@ -339,13 +375,17 @@ module.exports = class DataStore extends Emitter {
    * @param {Function} fn
    * @param {Array} signature
    */
-  _registerHandledMethod (methodName, fn, signature) {
-    if (this._handledMethods[methodName]) return;
+  _registerHandledMethod(methodName, fn, signature) {
+    if (this._handledMethods[methodName]) {
+      return;
+    }
 
     // Partially apply arguments for routing
     this._handledMethods[methodName] = this._routeHandledMethod.bind(this, methodName, fn, signature);
     // Expose method if it doesn't exist
-    if (!this[methodName]) this[methodName] = this._handledMethods[methodName];
+    if (!this[methodName]) {
+      this[methodName] = this._handledMethods[methodName];
+    }
   }
 
   /**
@@ -356,18 +396,22 @@ module.exports = class DataStore extends Emitter {
    * @param {*} args
    * @returns {Object|null}
    */
-  _routeHandledMethod (methodName, fn, signature, ...args) {
-    const isKeyed = signature[0] == 'key';
+  _routeHandledMethod(methodName, fn, signature, ...args) {
+    const isKeyed = signature[0] === 'key';
     let [key = '', ...rest] = args;
 
-    if (isKeyed && key && key.charAt(0) == '/') key = key.slice(1);
+    if (isKeyed && key && key.charAt(0) === '/') {
+      key = key.slice(1);
+    }
 
     // Defer to handlers
     if (this._handlers.length) {
       const context = new HandlerContext(this, methodName, signature, args);
 
       for (let i = 0, n = this._handlers.length; i < n; i++) {
-        if (this._isMatchKey(key, this._handlers[i].match)) this._handlers[i].handler(context);
+        if (this._isMatchKey(key, this._handlers[i].match)) {
+          this._handlers[i].handler(context);
+        }
       }
 
       const value = fn(this, ...context.toArguments());
@@ -385,7 +429,7 @@ module.exports = class DataStore extends Emitter {
  * @param {DataStore} store
  * @param {Object} data
  */
-function reset (store, data) {
+function reset(store, data) {
   store.debug('reset');
   store._data = data;
 }
@@ -397,20 +441,18 @@ function reset (store, data) {
  * @param {Object} config
  * @returns {Object}
  */
-function serialise (key, data, config) {
+function serialise(key, data, config) {
   if (isPlainObject(data)) {
     let obj = {};
 
     for (const prop in data) {
-      const keyChain = key
-        ? `${key}/${prop}`
-        : prop;
+      const keyChain = key ? `${key}/${prop}` : prop;
       const value = data[prop];
 
       if (config[keyChain] !== false) {
         if (isPlainObject(value)) {
           obj[prop] = serialise(keyChain, value, config);
-        } else if (value !== null && 'object' == typeof value && 'toJSON' in value) {
+        } else if (value !== null && typeof value === 'object' && 'toJSON' in value) {
           obj[prop] = value.toJSON();
         } else {
           obj[prop] = value;
@@ -421,9 +463,7 @@ function serialise (key, data, config) {
     return obj;
   }
 
-  return (config[key] !== false)
-    ? data
-    : null;
+  return config[key] !== false ? data : null;
 }
 
 /**
@@ -432,7 +472,7 @@ function serialise (key, data, config) {
  * @param {Object} data
  * @returns {Object}
  */
-function explode (store, data) {
+function explode(store, data) {
   if (isPlainObject(data)) {
     let obj = {};
 
@@ -441,7 +481,7 @@ function explode (store, data) {
     }
     return obj;
   } else if (Array.isArray(data)) {
-    return data.map((value) => explode(store, value));
+    return data.map(value => explode(store, value));
   } else if (store._isRefValue(data)) {
     return explode(store, store.get(store._parseRefKey(data)));
   }

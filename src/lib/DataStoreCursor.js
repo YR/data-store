@@ -8,7 +8,7 @@ module.exports = class DataStoreCursor {
    * @param {String} key
    * @param {DataStore} dataStore
    */
-  constructor (key, dataStore) {
+  constructor(key, dataStore) {
     this.dataStore = dataStore;
     this.key = key;
   }
@@ -20,20 +20,18 @@ module.exports = class DataStoreCursor {
    * @param {String|Array} [key]
    * @returns {*}
    */
-  get (key) {
-    const fixKey = (key) => {
+  get(key) {
+    const fixKey = key => {
       // Prefix with cursor key if not root
-      return (!this._isRootKey(key))
-        ? keys.join(this.key, key)
-        : key;
+      return !this._isRootKey(key) ? keys.join(this.key, key) : key;
     };
 
     // Handle empty key (set value at cursor root)
-    if (!key) key = this.key;
+    if (!key) {
+      key = this.key;
+    }
     // Handle array of keys
-    key = Array.isArray(key)
-      ? key.map(fixKey)
-      : fixKey(key);
+    key = Array.isArray(key) ? key.map(fixKey) : fixKey(key);
 
     return this.dataStore.get(key);
   }
@@ -47,12 +45,16 @@ module.exports = class DataStoreCursor {
    * @param {Object} [options]
    *  - {Boolean} merge
    */
-  update (key, value, options, ...args) {
+  update(key, value, options, ...args) {
     // Handle empty key (set value at cursor root)
-    if (!key) key = this.key;
+    if (!key) {
+      key = this.key;
+    }
 
     // Convert to batch
-    if ('string' == typeof key) key = { [key]: value };
+    if (typeof key === 'string') {
+      key = { [key]: value };
+    }
 
     // Fix keys (prefix with cursor key if not root)
     for (const k in key) {
@@ -71,14 +73,14 @@ module.exports = class DataStoreCursor {
    * @param {String} key
    * @returns {DataStoreCursor}
    */
-  createCursor (key) {
+  createCursor(key) {
     return this.dataStore.createCursor(keys.join(this.key, key));
   }
 
   /**
    * Destroy instance
    */
-  destroy () {
+  destroy() {
     this.dataStore = null;
   }
 
@@ -87,7 +89,7 @@ module.exports = class DataStoreCursor {
    * @param {String} key
    * @returns {Boolean}
    */
-  _isRootKey (key) {
-    return key ? (key.charAt(0) == '/') : false;
+  _isRootKey(key) {
+    return key ? key.charAt(0) == '/' : false;
   }
 };

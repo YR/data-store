@@ -19,7 +19,7 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Boolean} isWritable
    *  - {Object} serialisableKeys
    */
-  constructor (id, data, options = {}) {
+  constructor(id, data, options = {}) {
     options.handledMethods = {
       fetch: [fetch, ['key', 'url', 'options']]
     };
@@ -45,7 +45,7 @@ module.exports = class FetchableDataStore extends DataStore {
    *  - {Number} timeout
    * @returns {Promise}
    */
-  fetch (key, url, options) {
+  fetch(key, url, options) {
     if (!key) {
       return Promise.resolve({
         body: undefined,
@@ -55,16 +55,14 @@ module.exports = class FetchableDataStore extends DataStore {
       });
     }
 
-    if ('string' == typeof key) return this._handledMethods.fetch(key, url, options);
+    if (typeof key === 'string') {
+      return this._handledMethods.fetch(key, url, options);
+    }
     if (isPlainObject(key)) {
-      return Promise.all(
-        Object.keys(key)
-          .sort()
-          .map((k) => this._handledMethods.fetch(k, key[k], options))
-      );
+      return Promise.all(Object.keys(key).sort().map(k => this._handledMethods.fetch(k, key[k], options)));
     }
     if (Array.isArray(key)) {
-      return Promise.all(key.map((args) => this._handledMethods.fetch(...args)));
+      return Promise.all(key.map(args => this._handledMethods.fetch(...args)));
     }
   }
 
@@ -72,15 +70,17 @@ module.exports = class FetchableDataStore extends DataStore {
    * Abort all outstanding load requests
    * @param {String} [key]
    */
-  abort (key) {
+  abort(key) {
     // Too dangerous to abort on server in case more than one outstanding request
-    if (runtime.isBrowser) agent.abortAll(key);
+    if (runtime.isBrowser) {
+      agent.abortAll(key);
+    }
   }
 
   /**
    * Destroy instance
    */
-  destroy () {
+  destroy() {
     this.abort();
     super.destroy();
   }

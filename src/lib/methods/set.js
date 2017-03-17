@@ -22,12 +22,16 @@ const DEFAULT_OPTIONS = {
  *  - {Boolean} merge
  * @returns {null}
  */
-module.exports = function set (store, key, value, options) {
-  if (!key) return;
+module.exports = function set(store, key, value, options) {
+  if (!key) {
+    return;
+  }
 
   options = assign({}, DEFAULT_OPTIONS, options);
 
-  if ('string' == typeof key) return doSet(store, key, value, options);
+  if (typeof key === 'string') {
+    return doSet(store, key, value, options);
+  }
   if (isPlainObject(key)) {
     for (const k in key) {
       doSet(store, k, key[k], options);
@@ -51,7 +55,7 @@ module.exports = function set (store, key, value, options) {
  *  - {Boolean} immutable
  *  - {Boolean} merge
  */
-function doSet (store, key, value, options) {
+function doSet(store, key, value, options) {
   // Resolve back to original key if referenced
   key = store._resolveRefKey(key);
 

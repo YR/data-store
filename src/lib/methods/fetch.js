@@ -27,7 +27,7 @@ const DEFAULT_LOAD_OPTIONS = {
  *  - {Number} timeout
  * @returns {Promise}
  */
-module.exports = function fetch (store, key, url, options) {
+module.exports = function fetch(store, key, url, options) {
   if (!key) {
     return Promise.resolve({
       body: undefined,
@@ -39,20 +39,20 @@ module.exports = function fetch (store, key, url, options) {
 
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
 
-  if ('string' == typeof key) return doFetch(store, key, url, options);
+  if (typeof key === 'string') {
+    return doFetch(store, key, url, options);
+  }
   if (isPlainObject(key)) {
-    return Promise.all(
-      Object.keys(key)
-        .sort()
-        .map((k) => doFetch(store, k, key[k], options))
-    );
+    return Promise.all(Object.keys(key).sort().map(k => doFetch(store, k, key[k], options)));
   }
   if (Array.isArray(key)) {
-    return Promise.all(key.map((args) => {
-      const [k, u, o = {}] = args;
+    return Promise.all(
+      key.map(args => {
+        const [k, u, o = {}] = args;
 
-      return doFetch(store, k, u, assign({}, options, o));
-    }));
+        return doFetch(store, k, u, assign({}, options, o));
+      })
+    );
   }
 };
 
@@ -71,7 +71,7 @@ module.exports = function fetch (store, key, url, options) {
  *  - {Number} timeout
  * @returns {Promise}
  */
-function doFetch (store, key, url, options) {
+function doFetch(store, key, url, options) {
   const { minExpiry, staleWhileRevalidate, staleIfError } = options;
   const value = get(store, key);
   const isMissingOrExpired = !value || hasExpired(value, store.EXPIRES_KEY);
@@ -91,7 +91,7 @@ function doFetch (store, key, url, options) {
 
     const promiseToLoad = new Promise((resolve, reject) => {
       load(store, key, url, options)
-        .then((res) => {
+        .then(res => {
           resolve({
             body: get(store, key),
             duration: res.duration,
@@ -99,21 +99,27 @@ function doFetch (store, key, url, options) {
             key
           });
         })
-        .catch((err) => {
-          if (!staleIfError) return reject(err);
+        .catch(err => {
+          if (!staleIfError) {
+            return reject(err);
+          }
           resolve({
             body: value,
             duration: 0,
             error: err,
-            headers: { expires: (new Date(Date.now() + minExpiry)).toUTCString(), status: err.status },
+            headers: { expires: new Date(Date.now() + minExpiry).toUTCString(), status: err.status },
             key
           });
         });
     });
 
-    if (!(value && staleWhileRevalidate)) return promiseToLoad;
+    if (!(value && staleWhileRevalidate)) {
+      return promiseToLoad;
+    }
     // Prevent unhandled
-    promiseToLoad.catch((err) => { /* promise never returned, so swallow error */ });
+    promiseToLoad.catch(err => {
+      /* promise never returned, so swallow error */
+    });
   }
 
   // Return data (possibly stale)
@@ -139,7 +145,7 @@ function doFetch (store, key, url, options) {
  *  - {Number} timeout
  * @returns {Promise}
  */
-function load (store, key, url, options) {
+function load(store, key, url, options) {
   const { minExpiry, retry, staleIfError, timeout } = options;
 
   options.id = key;
@@ -150,7 +156,7 @@ function load (store, key, url, options) {
     .get(url, options)
     .timeout(timeout)
     .retry(retry)
-    .then((res) => {
+    .then(res => {
       store.debug('loaded "%s" in %dms', key, res.duration);
 
       // Guard against empty data
@@ -168,10 +174,12 @@ function load (store, key, url, options) {
 
       return res;
     })
-    .catch((err) => {
+    .catch(err => {
       store.debug('unable to load "%s" from %s', key, url);
 
-      if (!staleIfError) store.set(key, undefined, options);
+      if (!staleIfError) {
+        store.set(key, undefined, options);
+      }
 
       throw err;
     });
@@ -184,15 +192,15 @@ function load (store, key, url, options) {
  * @param {Number} grace
  * @returns {Number}
  */
-function getExpiry (dateString, minimum, grace) {
+function getExpiry(dateString, minimum, grace) {
   // Add latency overhead to compensate for transmission time
-  const expires = +(new Date(dateString)) + grace;
+  const expires = Number(new Date(dateString)) + grace;
   const now = Date.now();
 
-  return (expires > now)
+  return expires > now
     ? expires
-    // Local clock is set incorrectly
-    : now + minimum;
+    : // Local clock is set incorrectly
+      now + minimum;
 }
 
 /**
@@ -201,9 +209,6 @@ function getExpiry (dateString, minimum, grace) {
  * @param {String} expiresKey
  * @returns {Boolean}
  */
-function hasExpired (obj, expiresKey) {
-  return obj
-    && isPlainObject(obj)
-    && expiresKey in obj
-    && Date.now() > obj[expiresKey];
+function hasExpired(obj, expiresKey) {
+  return obj && isPlainObject(obj) && expiresKey in obj && Date.now() > obj[expiresKey];
 }

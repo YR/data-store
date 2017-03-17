@@ -16,12 +16,16 @@ const isPlainObject = require('is-plain-obj');
  *  - {Boolean} merge
  * @returns {null}
  */
-module.exports = function update (store, key, value, options, ...args) {
-  if (!key) return;
+module.exports = function update(store, key, value, options, ...args) {
+  if (!key) {
+    return;
+  }
 
   options = options || {};
 
-  if ('string' == typeof key) return doUpdate(store, key, value, options, ...args);
+  if (typeof key === 'string') {
+    return doUpdate(store, key, value, options, ...args);
+  }
   if (isPlainObject(key)) {
     for (const k in key) {
       doUpdate(store, k, key[k], options, ...args);
@@ -45,8 +49,10 @@ module.exports = function update (store, key, value, options, ...args) {
  * @param {Object} [options]
  *  - {Boolean} merge
  */
-function doUpdate (store, key, value, options, ...args) {
-  if (key.charAt(0) == '/') key = key.slice(1);
+function doUpdate(store, key, value, options, ...args) {
+  if (key.charAt(0) === '/') {
+    key = key.slice(1);
+  }
 
   store.debug('update %s', key);
 

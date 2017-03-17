@@ -7,10 +7,16 @@
  * @param {String|Array} [key]
  * @returns {String}
  */
-module.exports = function reference (store, key) {
-  if (!key) return store.REF_KEY;
-  if ('string' == typeof key) return doReference(store, key);
-  if (Array.isArray(key)) return key.map((k) => doReference(store, k));
+module.exports = function reference(store, key) {
+  if (!key) {
+    return store.REF_KEY;
+  }
+  if (typeof key === 'string') {
+    return doReference(store, key);
+  }
+  if (Array.isArray(key)) {
+    return key.map(k => doReference(store, k));
+  }
 };
 
 /**
@@ -19,7 +25,7 @@ module.exports = function reference (store, key) {
  * @param {String} key
  * @returns {String}
  */
-function doReference (store, key) {
+function doReference(store, key) {
   // Resolve back to original key if referenced
   key = store._resolveRefKey(key);
   return `${store.REF_KEY}${key}`;

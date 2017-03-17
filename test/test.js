@@ -12,8 +12,8 @@ const update = require('../src/lib/methods/update');
 
 let fake, store;
 
-describe('DataStore', function () {
-  beforeEach(function () {
+describe('DataStore', () => {
+  beforeEach(() => {
     store = createStore('store', {
       bar: 'bat',
       boo: {
@@ -31,46 +31,46 @@ describe('DataStore', function () {
       boop: ['__ref:bar', '__ref:bat']
     });
   });
-  afterEach(function () {
+  afterEach(() => {
     store.destroy();
   });
 
-  describe('get()', function () {
-    it('should return a value for a string key', function () {
+  describe('get()', () => {
+    it('should return a value for a string key', () => {
       expect(get(store, 'bar')).to.equal('bat');
       expect(get(store, '/bar')).to.equal('bat');
     });
-    it('should return all data if no key specified', function () {
+    it('should return all data if no key specified', () => {
       expect(get(store).bar).to.equal('bat');
     });
-    it('should return a referenced value', function () {
+    it('should return a referenced value', () => {
       expect(get(store, 'foo/boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
       expect(get(store, 'foo/boo/bat/foo')).to.eql('foo');
     });
-    it('should return a referenced value when passed a reference key', function () {
+    it('should return a referenced value when passed a reference key', () => {
       expect(get(store, '__ref:boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
     });
-    it('should return a resolved object of referenced values', function () {
+    it('should return a resolved object of referenced values', () => {
       expect(get(store, 'foo')).to.eql({ bar: 'foo', boo: { bar: 'foo', bat: { foo: 'foo' } }, bat: 'bat' });
     });
-    it('should return a resolved array of referenced values', function () {
+    it('should return a resolved array of referenced values', () => {
       expect(get(store, 'boop')).to.eql(['bat', ['foo', 'bar']]);
     });
   });
 
-  describe('set()', function () {
-    it('should do nothing if called with missing key', function () {
+  describe('set()', () => {
+    it('should do nothing if called with missing key', () => {
       const data = store._data;
 
       set(store, '', 'bar');
       set(store, null, 'bar');
       expect(store._data).to.equal(data);
     });
-    it('should store a value when called with simple key', function () {
+    it('should store a value when called with simple key', () => {
       set(store, 'foo', 'bar');
       expect(store._data.foo).to.equal('bar');
     });
-    it('should allow batch writes', function () {
+    it('should allow batch writes', () => {
       set(store, {
         '/test': 'success',
         'boop/bar': 'foo'
@@ -78,7 +78,7 @@ describe('DataStore', function () {
       expect(store._data.test).to.equal('success');
       expect(store._data.boop).to.have.property('bar', 'foo');
     });
-    it('should allow array batch writes', function () {
+    it('should allow array batch writes', () => {
       set(store, [
         ['/test', 'success'],
         ['boop/bar', 'foo']
@@ -86,18 +86,18 @@ describe('DataStore', function () {
       expect(store._data.test).to.equal('success');
       expect(store._data.boop).to.have.property('bar', 'foo');
     });
-    it('should update the original referenced value', function () {
+    it('should update the original referenced value', () => {
       set(store, 'foo/boo/bar', 'bar');
       expect(store._data.boo.bar).to.equal('bar');
     });
   });
 
-  describe('update()', function () {
-    it('should set a value for "key"', function () {
+  describe('update()', () => {
+    it('should set a value for "key"', () => {
       update(store, 'bar', 'bar');
       expect(get(store, 'bar')).to.equal('bar');
     });
-    it('should notify listeners', function (done) {
+    it('should notify listeners', (done) => {
       store.on('update', (key, value, oldValue) => {
         expect(key).to.equal('bar');
         expect(get(store, key)).to.equal(value);
@@ -106,7 +106,7 @@ describe('DataStore', function () {
       });
       update(store, 'bar', 'bar');
     });
-    it('should notify listeners of specific property', function (done) {
+    it('should notify listeners of specific property', (done) => {
       store.on('update:foo/bar', (value, oldValue) => {
         expect(value).to.equal('bar');
         expect(oldValue).to.equal('foo');
@@ -114,7 +114,7 @@ describe('DataStore', function () {
       });
       update(store, 'foo/bar', 'bar');
     });
-    it('should allow passing of additional arguments to listeners', function (done) {
+    it('should allow passing of additional arguments to listeners', (done) => {
       store.on('update', (key, value, oldValue, options, foo, bool) => {
         expect(oldValue).to.equal('bat');
         expect(foo).to.equal('foo');
@@ -125,70 +125,70 @@ describe('DataStore', function () {
     });
   });
 
-  describe('reference()', function () {
-    it('should return a key reference', function () {
+  describe('reference()', () => {
+    it('should return a key reference', () => {
       expect(reference(store, 'bar')).to.equal('__ref:bar');
     });
-    it('should return an already referenced key reference', function () {
+    it('should return an already referenced key reference', () => {
       expect(reference(store, 'foo/boo')).to.equal('__ref:boo');
     });
-    it('should return an array of key references', function () {
+    it('should return an array of key references', () => {
       expect(reference(store, ['bar', 'foo/bar'])).to.eql(['__ref:bar', '__ref:foo/bar']);
     });
   });
 
-  describe('instance', function () {
-    describe('constructor', function () {
-      it('should instantiate with passed data', function () {
+  describe('instance', () => {
+    describe('constructor', () => {
+      it('should instantiate with passed data', () => {
         expect(store.get).to.be.a(Function);
         expect(store._data).to.have.property('bar', 'bat');
       });
-      it('should instantiate with id', function () {
+      it('should instantiate with id', () => {
         store = createStore('foo');
         expect(store.id).to.equal('foo');
       });
     });
 
-    describe('_resolveRefKey()', function () {
-      it('should resolve key with no references', function () {
+    describe('_resolveRefKey()', () => {
+      it('should resolve key with no references', () => {
         expect(store._resolveRefKey('bar')).to.equal('bar');
         expect(store._resolveRefKey('zing/zoop')).to.equal('zing/zoop');
       });
-      it('should resolve key with references', function () {
+      it('should resolve key with references', () => {
         expect(store._resolveRefKey('foo/boo')).to.equal('boo');
       });
-      it('should resolve nested key with references', function () {
+      it('should resolve nested key with references', () => {
         expect(store._resolveRefKey('foo/boo/bat/foo')).to.equal('boo/bat/foo');
         expect(store._resolveRefKey('foo/boo/zing/zoop')).to.equal('boo/zing/zoop');
       });
     });
 
-    describe('get()', function () {
-      it('should return a value for a string key', function () {
+    describe('get()', () => {
+      it('should return a value for a string key', () => {
         expect(store.get('bar')).to.equal('bat');
         expect(store.get('/bar')).to.equal('bat');
       });
-      it('should return an array of values for an array of string keys', function () {
+      it('should return an array of values for an array of string keys', () => {
         expect(store.get(['bar', 'bat'])).to.eql(['bat', ['foo', 'bar']]);
       });
-      it('should return all data if no key specified', function () {
+      it('should return all data if no key specified', () => {
         expect(store.get().bar).to.equal('bat');
       });
     });
 
-    describe('set()', function () {
-      it('should do nothing if called with missing key', function () {
+    describe('set()', () => {
+      it('should do nothing if called with missing key', () => {
         const data = store._data;
 
         store.set('', 'bar');
         store.set(null, 'bar');
         expect(store._data).to.equal(data);
       });
-      it('should store a value when called with simple key', function () {
+      it('should store a value when called with simple key', () => {
         store.set('foo', 'bar');
         expect(store._data.foo).to.equal('bar');
       });
-      it('should allow batch writes', function () {
+      it('should allow batch writes', () => {
         store.set({
           '/test': 'success',
           'boop/bar': 'foo'
@@ -196,29 +196,29 @@ describe('DataStore', function () {
         expect(store._data.test).to.equal('success');
         expect(store._data.boop).to.have.property('bar', 'foo');
       });
-      it('should do nothing if dataStore is not writable', function () {
+      it('should do nothing if dataStore is not writable', () => {
         store.isWritable = false;
         store.set('foo', 'bar');
         expect(store._data.foo).to.not.equal('bar');
       });
     });
 
-    describe('update()', function () {
-      it('should set a value for "key"', function () {
+    describe('update()', () => {
+      it('should set a value for "key"', () => {
         store.update('bar', 'bar');
         expect(store.get('bar')).to.equal('bar');
       });
-      it('should allow batch writes', function () {
+      it('should allow batch writes', () => {
         store.update({ bar: 'bar', foo: 'bar' });
         expect(store.get('bar')).to.equal('bar');
         expect(store.get('foo')).to.equal('bar');
       });
-      it('should allow array batch writes', function () {
+      it('should allow array batch writes', () => {
         store.update([['bar', 'bar'], ['foo', 'bar']]);
         expect(store.get('bar')).to.equal('bar');
         expect(store.get('foo')).to.equal('bar');
       });
-      it('should notify listeners', function (done) {
+      it('should notify listeners', (done) => {
         store.on('update', (key, value, oldValue) => {
           expect(key).to.equal('bar');
           expect(store.get(key)).to.equal(value);
@@ -227,7 +227,7 @@ describe('DataStore', function () {
         });
         store.update('bar', 'bar');
       });
-      it('should notify listeners of specific property', function (done) {
+      it('should notify listeners of specific property', (done) => {
         store.on('update:foo/bar', (value, oldValue) => {
           expect(value).to.equal('bar');
           expect(oldValue).to.equal('foo');
@@ -235,7 +235,7 @@ describe('DataStore', function () {
         });
         store.update('foo/bar', 'bar');
       });
-      it('should allow passing of additional arguments to listeners', function (done) {
+      it('should allow passing of additional arguments to listeners', (done) => {
         store.on('update', (key, value, oldValue, options, foo, bool) => {
           expect(oldValue).to.equal('bat');
           expect(foo).to.equal('foo');
@@ -244,55 +244,63 @@ describe('DataStore', function () {
         });
         store.update('bar', 'bar', null, 'foo', true);
       });
-      it('should allow passing of additional arguments to listeners for batch writes', function (done) {
+      it('should allow passing of additional arguments to listeners for batch writes', (done) => {
         const obj = { bar: 'bar', boo: 'boo' };
         let i = 0;
 
         store.on('update', (key, value, oldValue, options, foo) => {
           expect(foo).to.equal('foo');
-          if (++i == 2) done();
+          if (++i == 2) {
+            done();
+          }
         });
         store.update(obj, null, null, 'foo');
       });
-      it('should allow passing of additional arguments to listeners for array batch writes', function (done) {
+      it('should allow passing of additional arguments to listeners for array batch writes', (done) => {
         const arr = [['bar', 'bar', null, 'foo'], ['boo', 'boo', null, 'bar']];
         let i = 0;
 
         store.on('update', (key, value, oldValue, options, extra) => {
-          if (key == 'bar') expect(extra).to.equal('foo');
-          if (key == 'boo') expect(extra).to.equal('bar');
-          if (++i == 2) done();
+          if (key == 'bar') {
+            expect(extra).to.equal('foo');
+          }
+          if (key == 'boo') {
+            expect(extra).to.equal('bar');
+          }
+          if (++i == 2) {
+            done();
+          }
         });
         store.update(arr);
       });
-      it('should be ignored if dataStore is not "isWritable"', function () {
+      it('should be ignored if dataStore is not "isWritable"', () => {
         store.isWritable = false;
         store.update('bar', 'bar');
         expect(store.get('bar')).to.not.equal('bar');
       });
     });
 
-    describe('cursors', function () {
-      describe('createCursor()', function () {
-        it('should generate a cursor instance', function () {
+    describe('cursors', () => {
+      describe('createCursor()', () => {
+        it('should generate a cursor instance', () => {
           const cursor = store.createCursor();
 
           expect(store.get('bar')).to.equal('bat');
           expect(cursor.get('bar')).to.equal('bat');
         });
-        it('should generate a cursor instance with a subset of data at "key"', function () {
+        it('should generate a cursor instance with a subset of data at "key"', () => {
           const cursor = store.createCursor('foo');
 
           expect(store.get('bar')).to.equal('bat');
           expect(cursor.get('bar')).to.equal('foo');
         });
-        it('should generate a cursor instance with a subset of data at reference "key"', function () {
+        it('should generate a cursor instance with a subset of data at reference "key"', () => {
           const cursor = store.createCursor('foo/boo');
 
           expect(cursor.get('bar')).to.equal('foo');
           expect(cursor.key).to.equal('/boo');
         });
-        it('should allow retrieving all cursor properties when no key specified', function () {
+        it('should allow retrieving all cursor properties when no key specified', () => {
           const cursor = store.createCursor('foo');
 
           expect(cursor.get()).to.eql({
@@ -307,7 +315,7 @@ describe('DataStore', function () {
           });
           expect(cursor.get()).to.eql(store.get('foo'));
         });
-        it('should enable creating a cursor from an existing cursor', function () {
+        it('should enable creating a cursor from an existing cursor', () => {
           const cursor1 = store.createCursor();
           const cursor2 = cursor1.createCursor('foo');
 
@@ -315,21 +323,21 @@ describe('DataStore', function () {
           expect(cursor1.get('bar')).to.equal('bat');
           expect(cursor2.get('bar')).to.equal('foo');
         });
-        it('should enable creating a cursor from an existing cursor at reference "key"', function () {
+        it('should enable creating a cursor from an existing cursor at reference "key"', () => {
           const cursor1 = store.createCursor('foo');
           const cursor2 = cursor1.createCursor('boo');
 
           expect(cursor1.get('boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
           expect(cursor2.get()).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
         });
-        it('should allow access to root properties', function () {
+        it('should allow access to root properties', () => {
           store.set('bat', 'zip');
           const cursor1 = store.createCursor('foo');
           const cursor2 = cursor1.createCursor('boo');
 
           expect(cursor2.get('/bat')).to.equal('zip');
         });
-        it('should access updated data after update to store', function () {
+        it('should access updated data after update to store', () => {
           const cursor = store.createCursor('foo');
 
           expect(cursor.get()).to.eql(store.get('foo'));
@@ -338,27 +346,27 @@ describe('DataStore', function () {
         });
       });
 
-      describe('update()', function () {
-        it('should set a value for "key" of a cursor', function () {
+      describe('update()', () => {
+        it('should set a value for "key" of a cursor', () => {
           const cursor = store.createCursor('foo');
 
           cursor.update('bar', 'bar');
           expect(store.get('foo/bar')).to.equal('bar');
         });
-        it('should set a root value for empty "key" of a cursor', function () {
+        it('should set a root value for empty "key" of a cursor', () => {
           const cursor = store.createCursor('foo');
 
           cursor.update(null, { bar: 'bar' });
           expect(store.get('foo/bar')).to.equal('bar');
         });
-        it('should remove a cursor key when null value specified', function () {
+        it('should remove a cursor key when null value specified', () => {
           const cursor = store.createCursor('foo');
 
           cursor.update();
           expect(store.get('foo/bar')).to.equal(undefined);
           expect(store._data).to.not.have.property('foo');
         });
-        it('should allow batch writes', function () {
+        it('should allow batch writes', () => {
           const cursor = store.createCursor('foo/boo');
           const obj = {
             bar: 'bar',
@@ -370,7 +378,7 @@ describe('DataStore', function () {
           expect(store.createCursor('foo/boo').get('bar')).to.equal('bar');
           expect(store.get('bar')).to.equal('bar');
         });
-        it('should notify listeners on update of a cursor', function (done) {
+        it('should notify listeners on update of a cursor', (done) => {
           const cursor = store.createCursor('foo');
 
           store.on('update', (key, value, oldValue) => {
@@ -384,41 +392,41 @@ describe('DataStore', function () {
       });
     });
 
-    describe('destroy()', function () {
-      it('should destroy all data references', function () {
+    describe('destroy()', () => {
+      it('should destroy all data references', () => {
         store.destroy();
         expect(store.destroyed).to.eql(true);
         expect(store._data).to.eql({});
       });
     });
 
-    describe('dump()', function () {
-      it('should return a serialisable json object with no excluded properties', function () {
+    describe('dump()', () => {
+      it('should return a serialisable json object with no excluded properties', () => {
         store.setSerialisabilityOfKey('bar', false);
         const data = store.dump();
 
         expect(data.bar).to.equal('bat');
       });
-      it('should return an object with resolved references', function () {
+      it('should return an object with resolved references', () => {
         const data = store.dump();
 
         expect(data.foo.boo.bar).to.equal('foo');
       });
-      it('should optionally return a serialised string', function () {
+      it('should optionally return a serialised string', () => {
         const json = store.dump(true);
 
         expect(json).to.be.a.String;
       });
     });
 
-    describe('toJSON()', function () {
-      it('should return a serialisable json object', function () {
+    describe('toJSON()', () => {
+      it('should return a serialisable json object', () => {
         const json = store.toJSON();
 
         expect(json).to.be.an.Object;
         expect(json.bar).to.equal('bat');
       });
-      it('should return a serialisable json object with correctly handled array properties', function () {
+      it('should return a serialisable json object with correctly handled array properties', () => {
         const json = JSON.stringify(store);
 
         expect(json).to.be.a.String;
@@ -426,7 +434,7 @@ describe('DataStore', function () {
         expect(JSON.parse(json)).to.have.property('bat');
         expect(JSON.parse(json).bat).to.eql(['foo', 'bar']);
       });
-      it('should return a serialisable json object with excluded properties', function () {
+      it('should return a serialisable json object with excluded properties', () => {
         store.set('bing', 'bong', { serialisable: false });
         const json = store.toJSON();
 
@@ -434,7 +442,7 @@ describe('DataStore', function () {
         expect(json.bar).to.equal('bat');
         expect(json.bing).to.not.exist;
       });
-      it('should return a serialisable json object with excluded nested properties', function () {
+      it('should return a serialisable json object with excluded nested properties', () => {
         store.set('foo/bar', 'bong', { serialisable: false });
         const json = store.toJSON();
 
@@ -442,12 +450,12 @@ describe('DataStore', function () {
         expect(json.bar).to.equal('bat');
         expect(json.foo.bar).to.not.exist;
       });
-      it('should return a serialised json object at specific key', function () {
+      it('should return a serialised json object at specific key', () => {
         const json = store.toJSON('foo');
 
         expect(json).to.eql(store.get('foo'));
       });
-      it('should return a serialised json object at specific key with excluded properties', function () {
+      it('should return a serialised json object at specific key with excluded properties', () => {
         store.set('foo/bar', 'bong', { serialisable: false });
         const json = store.toJSON('foo');
 
@@ -455,8 +463,8 @@ describe('DataStore', function () {
       });
     });
 
-    describe('handling', function () {
-      it('should ignore invalid handlers', function () {
+    describe('handling', () => {
+      it('should ignore invalid handlers', () => {
         store.use();
         store.use(true);
         store.use(false);
@@ -468,33 +476,33 @@ describe('DataStore', function () {
         store.use('foo', undefined);
         expect(store._handlers).to.eql([]);
       });
-      it('should allow middleware', function () {
+      it('should allow middleware', () => {
         let run = 0;
 
-        store.use(function (context) {
+        store.use((context) => {
           run++;
           expect(context.method).to.equal('reset');
         });
         store.reset({});
         expect(run).to.equal(1);
       });
-      it('should allow delegation', function () {
+      it('should allow delegation', () => {
         let run = 0;
 
-        store.use(/zing/, function (context) {
+        store.use(/zing/, (context) => {
           run++;
           context.value = 'bar';
           expect(context.key).to.equal('zing');
           expect(context.method).to.equal('set');
         });
         store.set('zing', 'foo');
-        expect(store._data.zing).to.equal('bar');
         expect(run).to.equal(1);
+        expect(store._data.zing).to.equal('bar');
       });
-      it('should allow handling with option merging', function () {
+      it('should allow handling with option merging', () => {
         let run = 0;
 
-        store.use(/foo/, function (context) {
+        store.use(/foo/, (context) => {
           run++;
           context.merge('options', { merge: false });
           expect(context.key).to.equal('foo');
@@ -503,14 +511,14 @@ describe('DataStore', function () {
         expect(store._data.foo).to.eql({ bar: 'bar' });
         expect(run).to.equal(1);
       });
-      it('should allow multiple handlers', function () {
+      it('should allow multiple handlers', () => {
         let run = 0;
 
-        store.use(/zing/, function (context) {
+        store.use(/zing/, (context) => {
           run++;
           context.value = 'bar';
         });
-        store.use(/zing/, function (context) {
+        store.use(/zing/, (context) => {
           run++;
         });
         store.set('zing', 'foo');
@@ -519,10 +527,10 @@ describe('DataStore', function () {
       });
     });
 
-    describe('unhandling', function () {
-      it('should remove a single handler', function () {
+    describe('unhandling', () => {
+      it('should remove a single handler', () => {
         let run = 0;
-        const fn = function (context) {
+        const fn = (context) => {
           run++;
         };
 
@@ -533,11 +541,11 @@ describe('DataStore', function () {
         store.set('bar', 'boop');
         expect(run).to.equal(1);
       });
-      it('should remove batched handlers', function () {
+      it('should remove batched handlers', () => {
         let run = 0;
         const handlers = [
-          [function (context) { run++; }],
-          [function (context) { run++; }]
+          [(context) => { run++; }],
+          [(context) => { run++; }]
         ];
 
         store.use(handlers);
@@ -551,8 +559,8 @@ describe('DataStore', function () {
   });
 });
 
-describe('FetchableDataStore', function () {
-  beforeEach(function () {
+describe('FetchableDataStore', () => {
+  beforeEach(() => {
     store = createStore('store', {
       bar: 'bat',
       boo: 'foo',
@@ -565,39 +573,39 @@ describe('FetchableDataStore', function () {
       bat: ['foo', 'bar']
     }, { isFetchable: true });
   });
-  afterEach(function () {
+  afterEach(() => {
     store.destroy();
   });
 
-  describe('constructor', function () {
-    it('should register handlers', function () {
+  describe('constructor', () => {
+    it('should register handlers', () => {
       store.destroy();
-      store = createStore('store', {}, { isFetchable: true, handlers: [[/foo/, function (context) {}]] });
+      store = createStore('store', {}, { isFetchable: true, handlers: [[/foo/, (context) => {}]] });
       expect(store._handledMethods).to.have.property('fetch');
     });
   });
 
-  describe('fetch()', function () {
-    beforeEach(function () {
+  describe('fetch()', () => {
+    beforeEach(() => {
       fake = nock('http://localhost');
     });
-    afterEach(function () {
+    afterEach(() => {
       nock.cleanAll();
     });
 
-    it('should return a Promise without the value if missing "key"', function () {
+    it('should return a Promise without the value if missing "key"', () => {
       return store.fetch(null, 'bar', {})
         .then((result) => {
           expect(result.body).to.equal(undefined);
         });
     });
-    it('should return a Promise with the value', function () {
+    it('should return a Promise with the value', () => {
       return store.fetch('bar', 'bar', {})
         .then((result) => {
           expect(result.body).to.equal('bat');
         });
     });
-    it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', function () {
+    it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', () => {
       set(store, 'foo/__expires', 0);
 
       return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true })
@@ -605,7 +613,7 @@ describe('FetchableDataStore', function () {
           expect(result.body).to.not.have.property('foo');
         });
     });
-    it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', function () {
+    it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', () => {
       fake
         .get('/foo')
         .reply(200, { foo: 'foo' });
@@ -616,7 +624,7 @@ describe('FetchableDataStore', function () {
           expect(result.body).to.have.property('foo', 'foo');
         });
     });
-    it('should return a Promise with expired value when "options.staleIfError = true" and value', function () {
+    it('should return a Promise with expired value when "options.staleIfError = true" and value', () => {
       fake
         .get('/foo')
         .replyWithError(500);
@@ -628,7 +636,7 @@ describe('FetchableDataStore', function () {
           expect(result.body).to.have.property('bar', 'boo');
         });
     });
-    it('should return a rejected Promise when failure loading', function () {
+    it('should return a rejected Promise when failure loading', () => {
       fake
         .get('/beep')
         .replyWithError('oops');
@@ -642,7 +650,7 @@ describe('FetchableDataStore', function () {
           expect(err.status).to.equal(500);
         });
     });
-    it('should return a rejected Promise when "options.staleIfError = false" and existing value', function () {
+    it('should return a rejected Promise when "options.staleIfError = false" and existing value', () => {
       fake
         .get('/foo')
         .replyWithError(500);
@@ -657,7 +665,7 @@ describe('FetchableDataStore', function () {
           expect(err).to.have.property('status', 500);
         });
     });
-    it('should return a rejected Promise when "options.staleIfError = false" and no existing value', function () {
+    it('should return a rejected Promise when "options.staleIfError = false" and no existing value', () => {
       fake
         .get('/zoop')
         .replyWithError(500);
@@ -671,7 +679,7 @@ describe('FetchableDataStore', function () {
           expect(err).to.have.property('status', 500);
         });
     });
-    it('should return a Promise for batch fetching', function () {
+    it('should return a Promise for batch fetching', () => {
       fake
         .get('/foo')
         .reply(200, { foo: 'foo' })
@@ -685,7 +693,7 @@ describe('FetchableDataStore', function () {
           expect(results[1].body).to.have.property('foo', 'foo');
         });
     });
-    it('should return a Promise for array batch fetching', function () {
+    it('should return a Promise for array batch fetching', () => {
       fake
         .get('/foo')
         .reply(200, { foo: 'foo' })
@@ -702,7 +710,7 @@ describe('FetchableDataStore', function () {
           expect(results[1].body).to.have.property('bar', 'bar');
         });
     });
-    it('should do nothing when loading aborted', function (done) {
+    it('should do nothing when loading aborted', (done) => {
       fake
         .get('/beep')
         .delayConnection(50)
@@ -717,15 +725,15 @@ describe('FetchableDataStore', function () {
   });
 });
 
-describe('HandlerContext', function () {
-  describe('constructor', function () {
-    it('should assign passed args based on signature', function () {
+describe('HandlerContext', () => {
+  describe('constructor', () => {
+    it('should assign passed args based on signature', () => {
       const context = new HandlerContext({}, 'set', ['key', 'value'], ['foo', 'bar']);
 
       expect(context.key).to.equal('foo');
       expect(context.value).to.equal('bar');
     });
-    it('should assign passed args, including rest argument', function () {
+    it('should assign passed args, including rest argument', () => {
       const context = new HandlerContext({}, 'set', ['key', 'value', '...args'], ['foo', 'bar', true]);
 
       expect(context.key).to.equal('foo');
@@ -734,14 +742,14 @@ describe('HandlerContext', function () {
     });
   });
 
-  describe('merge', function () {
-    it('should define missing options', function () {
+  describe('merge', () => {
+    it('should define missing options', () => {
       const context = new HandlerContext({}, 'set', ['key', 'value', 'options'], ['foo', 'bar']);
 
       context.merge('options', { merge: false });
       expect(context.options).to.eql({ merge: false });
     });
-    it('should merge existing options', function () {
+    it('should merge existing options', () => {
       const context = new HandlerContext({}, 'set', ['key', 'value', 'options'], ['foo', 'bar', { foo: true }]);
 
       context.merge('options', { merge: false });
@@ -749,13 +757,13 @@ describe('HandlerContext', function () {
     });
   });
 
-  describe('toArguments', function () {
-    it('should return args based on signature', function () {
+  describe('toArguments', () => {
+    it('should return args based on signature', () => {
       const context = new HandlerContext({}, 'set', ['key', 'value'], ['foo', 'bar']);
 
       expect(context.toArguments()).to.eql(['foo', 'bar']);
     });
-    it('should return args, including rest argument', function () {
+    it('should return args, including rest argument', () => {
       const context = new HandlerContext({}, 'set', ['key', 'value', '...args'], ['foo', 'bar', true]);
 
       expect(context.toArguments()).to.eql(['foo', 'bar', true]);

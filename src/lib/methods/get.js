@@ -11,8 +11,10 @@ const property = require('@yr/property');
  * @param {String|Array} [key]
  * @returns {*}
  */
-module.exports = function get (store, key) {
-  if (!key) return store._data;
+module.exports = function get(store, key) {
+  if (!key) {
+    return store._data;
+  }
   return doGet(store, key);
 };
 
@@ -22,7 +24,7 @@ module.exports = function get (store, key) {
  * @param {String} key
  * @returns {*}
  */
-function doGet (store, key) {
+function doGet(store, key) {
   // Resolve back to original key if referenced
   key = store._resolveRefKey(key);
 
@@ -30,10 +32,8 @@ function doGet (store, key) {
 
   // Shallow resolve embedded references
   if (Array.isArray(value)) {
-    return value.map((item) => {
-      return store._isRefValue(item)
-        ? property.get(store._data, store._parseRefKey(item))
-        : item;
+    return value.map(item => {
+      return store._isRefValue(item) ? property.get(store._data, store._parseRefKey(item)) : item;
     });
   } else if (isPlainObject(value)) {
     let v = {};

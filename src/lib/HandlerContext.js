@@ -11,7 +11,7 @@ module.exports = class HandlerContext {
    * @param {Array} signature
    * @param {Array} args
    */
-  constructor (store, methodName, signature, args) {
+  constructor(store, methodName, signature, args) {
     this.method = methodName;
     this.signature = signature;
     this.store = store;
@@ -34,8 +34,10 @@ module.exports = class HandlerContext {
    * @param {String} propName
    * @param {Object} prop
    */
-  merge (propName, prop) {
-    if (!isPlainObject(prop)) return;
+  merge(propName, prop) {
+    if (!isPlainObject(prop)) {
+      return;
+    }
     this[propName] = assign({}, this[propName], prop);
   }
 
@@ -43,7 +45,7 @@ module.exports = class HandlerContext {
    * Convert instance to arguments
    * @returns {Array}
    */
-  toArguments () {
+  toArguments() {
     let args = [];
 
     for (let i = 0, n = this.signature.length; i < n; i++) {
@@ -63,7 +65,7 @@ module.exports = class HandlerContext {
   /**
    * Destroy
    */
-  destroy () {
+  destroy() {
     for (const prop in this) {
       this[prop] = null;
     }
