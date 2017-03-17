@@ -435,20 +435,23 @@ describe('DataStore', () => {
         expect(JSON.parse(json).bat).to.eql(['foo', 'bar']);
       });
       it('should return a serialisable json object with excluded properties', () => {
-        store.set('bing', 'bong', { serialisable: false });
+        store.set('bing', 'bong');
+        store.setSerialisabilityOfKey({ bing: false, bat: false });
         const json = store.toJSON();
 
         expect(json).to.be.an.Object;
         expect(json.bar).to.equal('bat');
-        expect(json.bing).to.not.exist;
+        expect(json.bing).to.equal(undefined);
+        expect(json.bat).to.equal(undefined);
       });
       it('should return a serialisable json object with excluded nested properties', () => {
-        store.set('foo/bar', 'bong', { serialisable: false });
+        store.set('foo/bar', 'bong');
+        store.setSerialisabilityOfKey('foo/bar', false);
         const json = store.toJSON();
 
         expect(json).to.be.an.Object;
         expect(json.bar).to.equal('bat');
-        expect(json.foo.bar).to.not.exist;
+        expect(json.foo.bar).to.equal(undefined);
       });
       it('should return a serialised json object at specific key', () => {
         const json = store.toJSON('foo');
@@ -456,10 +459,11 @@ describe('DataStore', () => {
         expect(json).to.eql(store.get('foo'));
       });
       it('should return a serialised json object at specific key with excluded properties', () => {
-        store.set('foo/bar', 'bong', { serialisable: false });
+        store.set('foo/bar', 'bong');
+        store.setSerialisabilityOfKey('foo/bar', false);
         const json = store.toJSON('foo');
 
-        expect(json.bar).to.not.exist;
+        expect(json.bar).to.equal(undefined);
       });
     });
 

@@ -239,7 +239,7 @@ module.exports = class DataStore extends Emitter {
     // Handle batch
     if (isPlainObject(key)) {
       for (const k in key) {
-        this.setSerialisabilityOfKey(k, value);
+        this.setSerialisabilityOfKey(k, key[k]);
       }
       return;
     }
