@@ -76,7 +76,7 @@ module.exports = class DataStore extends Emitter {
         handler = match;
         match = '';
       }
-      if ('string' == typeof match && 'function' == typeof handler && !~handlers.indexOf(handler)) {
+      if (typeof handler === 'function') {
         this._handlers.push({ handler, match });
       }
     });
