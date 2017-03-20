@@ -400,21 +400,21 @@ describe('DataStore', () => {
 
   describe('handling', () => {
     it('should ignore invalid handlers', () => {
-      store.use();
-      store.use(true);
-      store.use(false);
-      store.use(null);
-      store.use(undefined);
-      store.use('foo', true);
-      store.use('foo', false);
-      store.use('foo', null);
-      store.use('foo', undefined);
+      store.useHandler();
+      store.useHandler(true);
+      store.useHandler(false);
+      store.useHandler(null);
+      store.useHandler(undefined);
+      store.useHandler('foo', true);
+      store.useHandler('foo', false);
+      store.useHandler('foo', null);
+      store.useHandler('foo', undefined);
       expect(store._handlers).to.eql([]);
     });
     it('should allow middleware', () => {
       let run = 0;
 
-      store.use(context => {
+      store.useHandler(context => {
         run++;
         expect(context.method).to.equal('reset');
       });
@@ -424,7 +424,7 @@ describe('DataStore', () => {
     it('should allow delegation', () => {
       let run = 0;
 
-      store.use(/zing/, context => {
+      store.useHandler(/zing/, context => {
         run++;
         context.value = 'bar';
         expect(context.key).to.equal('zing');
@@ -437,7 +437,7 @@ describe('DataStore', () => {
     it('should allow handling with option merging', () => {
       let run = 0;
 
-      store.use(/foo/, context => {
+      store.useHandler(/foo/, context => {
         run++;
         context.merge('options', { merge: false });
         expect(context.key).to.equal('foo');
@@ -449,11 +449,11 @@ describe('DataStore', () => {
     it('should allow multiple handlers', () => {
       let run = 0;
 
-      store.use(/zing/, context => {
+      store.useHandler(/zing/, context => {
         run++;
         context.value = 'bar';
       });
-      store.use(/zing/, context => {
+      store.useHandler(/zing/, context => {
         run++;
       });
       store.set('zing', 'foo');
@@ -469,10 +469,10 @@ describe('DataStore', () => {
         run++;
       };
 
-      store.use(fn);
+      store.useHandler(fn);
       store.set('bar', 'boo');
       expect(run).to.equal(1);
-      store.unuse(fn);
+      store.unuseHandler(fn);
       store.set('bar', 'boop');
       expect(run).to.equal(1);
     });
@@ -491,10 +491,10 @@ describe('DataStore', () => {
         ]
       ];
 
-      store.use(handlers);
+      store.useHandler(handlers);
       store.set('bar', 'boo');
       expect(run).to.equal(2);
-      store.unuse(handlers);
+      store.unuseHandler(handlers);
       store.set('bar', 'boop');
       expect(run).to.equal(2);
     });

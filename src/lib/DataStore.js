@@ -55,7 +55,7 @@ module.exports = class DataStore extends Emitter {
       this._registerHandledMethod(methodName, ...handledMethods[methodName]);
     }
     if (options.handlers) {
-      this.use(options.handlers);
+      this.useHandler(options.handlers);
     }
 
     this.reset(data || {});
@@ -67,7 +67,7 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String|Array} [match]
    * @param {Function} handler
    */
-  use(match, handler) {
+  useHandler(match, handler) {
     const matches = !Array.isArray(match) ? [[match, handler]] : match;
 
     const handlers = this._handlers.map(({ handler }) => handler);
@@ -88,7 +88,7 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String|Array} [match]
    * @param {Function} handler
    */
-  unuse(match, handler) {
+  unuseHandler(match, handler) {
     const matches = !Array.isArray(match) ? [[match, handler]] : match;
 
     for (let i = 0, n = matches.length; i < n; i++) {
