@@ -11,6 +11,7 @@ module.exports = class DataStoreCursor {
   constructor(key, dataStore) {
     this.dataStore = dataStore;
     this.key = key;
+    this.trigger = dataStore.trigger.bind(dataStore);
   }
 
   /**
@@ -37,38 +38,6 @@ module.exports = class DataStoreCursor {
   }
 
   /**
-   * Store 'value' at 'key', notifying listeners of change
-   * Allows passing of arbitrary additional args to listeners
-   * Hash of 'key:value' pairs batches changes
-   * @param {String|Object} key
-   * @param {Object} value
-   * @param {Object} [options]
-   *  - {Boolean} merge
-   */
-  update(key, value, options, ...args) {
-    // Handle empty key (set value at cursor root)
-    if (!key) {
-      key = this.key;
-    }
-
-    // Convert to batch
-    if (typeof key === 'string') {
-      key = { [key]: value };
-    }
-
-    // Fix keys (prefix with cursor key if not root)
-    for (const k in key) {
-      if (!this._isRootKey(k)) {
-        key[keys.join(this.key, k)] = key[k];
-        delete key[k];
-      }
-    }
-
-    // Batch update
-    this.dataStore.update(key, null, options, ...args);
-  }
-
-  /**
    * Retrieve an instance reference at 'key' to a subset of data
    * @param {String} key
    * @returns {DataStoreCursor}
@@ -82,6 +51,7 @@ module.exports = class DataStoreCursor {
    */
   destroy() {
     this.dataStore = null;
+    this.trigger = null;
   }
 
   /**

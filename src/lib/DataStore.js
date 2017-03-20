@@ -36,6 +36,7 @@ module.exports = class DataStore {
     this.id = id || `store${++uid}`;
     this.isWritable = 'isWritable' in options ? options.isWritable : true;
 
+    this._actions = {};
     this._cursors = {};
     this._data = {};
     this._handledMethods = {};
@@ -64,19 +65,23 @@ module.exports = class DataStore {
    * @param {Function} handler
    */
   useHandler(match, handler) {
-    const matches = !Array.isArray(match) ? [[match, handler]] : match;
+    const handlers = !Array.isArray(match) ? [[match, handler]] : match;
+    let count = 0;
 
-    const handlers = this._handlers.map(({ handler }) => handler);
-
-    matches.forEach(([match, handler]) => {
+    handlers.forEach(([match, handler]) => {
       if (typeof match === 'function') {
         handler = match;
         match = '';
       }
       if (typeof handler === 'function') {
         this._handlers.push({ handler, match });
+        count++;
       }
     });
+
+    if (count) {
+      this.debug(`using ${count} new handler${count > 1 ? 's' : ''}`);
+    }
   }
 
   /**
@@ -100,6 +105,48 @@ module.exports = class DataStore {
           this._handlers.splice(j, 1);
         }
       }
+    }
+  }
+
+  /**
+   * Register 'action' under 'name'
+   * @param {String|Array} name
+   * @param {Function} action
+   */
+  registerAction(name, action) {
+    const actions = !Array.isArray(action) ? [[name, action]] : name;
+
+    actions.forEach(([name, action]) => {
+      if (typeof action === 'function') {
+        this._actions[name] = action;
+        this.debug(`registered ${name} action`);
+      }
+    });
+  }
+
+  /**
+   * Unregister 'name' action
+   * @param {String} name
+   */
+  unregisterAction(name) {
+    if (this._actions[name]) {
+      delete this._actions[name];
+    }
+  }
+
+  /**
+   * Trigger registered action with optional 'args
+   * @param {String} name
+   * @param {Array} [args]
+   */
+  trigger(name, ...args) {
+    const action = this._actions[name];
+
+    if (action) {
+      this.debug(`triggering ${name} action`);
+      action(this, ...args);
+    } else {
+      this.debug(`action ${name} not registered`);
     }
   }
 
@@ -191,6 +238,7 @@ module.exports = class DataStore {
       this._cursors[key].destroy();
     }
     this.destroyed = true;
+    this._actions = {};
     this._cursors = {};
     this._data = {};
     this._handlers = [];
