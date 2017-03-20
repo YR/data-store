@@ -11,11 +11,13 @@ const DEFAULT_LOAD_OPTIONS = {
   timeout: 5000
 };
 
+module.exports = fetch;
+module.exports.all = fetchAll;
+
 /**
  * Fetch data. If expired, load from 'url' and store at 'key'
- * Hash of 'key:url' pairs batches calls
  * @param {DataStore} store
- * @param {String|Object} key
+ * @param {String} key
  * @param {String} url
  * @param {Object} options
  *  - {Boolean} abort
@@ -25,9 +27,9 @@ const DEFAULT_LOAD_OPTIONS = {
  *  - {Boolean} staleWhileRevalidate
  *  - {Boolean} staleIfError
  *  - {Number} timeout
- * @returns {Promise}
+ * @returns {Promise<Response>}
  */
-module.exports = function fetch(store, key, url, options) {
+function fetch(store, key, url, options) {
   if (!key) {
     return Promise.resolve({
       body: undefined,
@@ -39,22 +41,37 @@ module.exports = function fetch(store, key, url, options) {
 
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
 
-  if (typeof key === 'string') {
-    return doFetch(store, key, url, options);
-  }
-  if (isPlainObject(key)) {
-    return Promise.all(Object.keys(key).sort().map(k => doFetch(store, k, key[k], options)));
-  }
-  if (Array.isArray(key)) {
-    return Promise.all(
-      key.map(args => {
-        const [k, u, o = {}] = args;
+  return doFetch(store, key, url, options);
+}
 
-        return doFetch(store, k, u, assign({}, options, o));
+/**
+ * Batch version of 'fetch()'
+ * Accepts an array of tuples [[key: String, url: String, options: Object]]
+ * @param {DataStore} store
+ * @param {Array<Array>} keys
+ * @param {Object} [options]
+ *  - {Boolean} abort
+ *  - {Boolean} ignoreQuery
+ *  - {Number} minExpiry
+ *  - {Number} retry
+ *  - {Boolean} staleWhileRevalidate
+ *  - {Boolean} staleIfError
+ *  - {Number} timeout
+ * @returns {Promise<Array>}
+ */
+function fetchAll(store, keys, options) {
+  if (Array.isArray(keys)) {
+    return Promise.all(
+      keys.map(args => {
+        const [key, url, opts = {}] = args;
+
+        return fetch(store, key, url, assign({}, options, opts));
       })
     );
   }
-};
+
+  return Promise.resolve([]);
+}
 
 /**
  * Fetch data. If expired, load from 'url' and store at 'key'

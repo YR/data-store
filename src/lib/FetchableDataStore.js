@@ -21,7 +21,8 @@ module.exports = class FetchableDataStore extends DataStore {
    */
   constructor(id, data, options = {}) {
     options.handledMethods = {
-      fetch: [fetch, ['key', 'url', 'options']]
+      fetch: [fetch, ['key', 'url', 'options']],
+      fetchAll: [fetch.all, ['keys', 'options']]
     };
 
     super(id, data, options);
@@ -32,10 +33,9 @@ module.exports = class FetchableDataStore extends DataStore {
 
   /**
    * Fetch data. If expired, load from 'url' and store at 'key'
-   * Hash of 'key:url' pairs batches calls
    * @param {String|Object} key
    * @param {String} url
-   * @param {Object} options
+   * @param {Object} [options]
    *  - {Boolean} abort
    *  - {Boolean} ignoreQuery
    *  - {Number} minExpiry
@@ -46,24 +46,25 @@ module.exports = class FetchableDataStore extends DataStore {
    * @returns {Promise}
    */
   fetch(key, url, options) {
-    if (!key) {
-      return Promise.resolve({
-        body: undefined,
-        duration: 0,
-        headers: { status: 500 },
-        key
-      });
-    }
+    return this._handledMethods.fetch(key, url, options);
+  }
 
-    if (typeof key === 'string') {
-      return this._handledMethods.fetch(key, url, options);
-    }
-    if (isPlainObject(key)) {
-      return Promise.all(Object.keys(key).sort().map(k => this._handledMethods.fetch(k, key[k], options)));
-    }
-    if (Array.isArray(key)) {
-      return Promise.all(key.map(args => this._handledMethods.fetch(...args)));
-    }
+  /**
+   * Batch version of 'fetch()'
+   * Accepts an array of tuples [[key: String, url: String, options: Object]]
+   * @param {Array<Array>} keys
+   * @param {Object} [options]
+   *  - {Boolean} abort
+   *  - {Boolean} ignoreQuery
+   *  - {Number} minExpiry
+   *  - {Number} retry
+   *  - {Boolean} staleWhileRevalidate
+   *  - {Boolean} staleIfError
+   *  - {Number} timeout
+   * @returns {Promise<Array>}
+   */
+  fetchAll(keys, options) {
+    return this._handledMethods.fetchAll(keys, options);
   }
 
   /**

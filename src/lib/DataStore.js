@@ -13,7 +13,8 @@ const update = require('./methods/update');
 
 const HANDLED_METHODS = {
   reset: [reset, ['data']],
-  set: [set, ['key', 'value', 'options']]
+  set: [set, ['key', 'value', 'options']],
+  setAll: [set.all, ['keys', 'options']]
 };
 const REF_KEY = '__ref:';
 
@@ -108,47 +109,54 @@ module.exports = class DataStore extends Emitter {
 
   /**
    * Retrieve value stored at 'key'
-   * Empty 'key' returns all data
-   * Array of keys returns array of values
-   * @param {String|Array} [key]
+   * Empty/null/undefined 'key' returns all data
+   * @param {String} [key]
    * @returns {*}
    */
   get(key) {
-    if (!key || typeof key === 'string') {
-      return get(this, key);
-    }
-    if (Array.isArray(key)) {
-      return key.map(k => get(this, k));
-    }
+    return get(this, key);
+  }
+
+  /**
+   * Batch version of 'get()'
+   * Accepts array of 'keys'
+   * @param {Array} keys
+   * @returns {Array}
+   */
+  getAll(keys) {
+    return get.all(this, keys);
   }
 
   /**
    * Store 'value' at 'key'
-   * Hash of 'key:value' pairs batches changes
    * @param {String} key
    * @param {*} value
    * @param {Object} [options]
    *  - {Boolean} immutable
    *  - {Boolean} merge
-   * @returns {null}
+   * @returns {void}
    */
   set(key, value, options) {
-    if (!this.isWritable || !key) {
+    if (!this.isWritable) {
       return;
     }
-    if (typeof key === 'string') {
-      return this._handledMethods.set(key, value, options);
+    return this._handledMethods.set(key, value, options);
+  }
+
+  /**
+   * Batch version of 'set()'
+   * Accepts hash of key/value pairs
+   * @param {Object} keys
+   * @param {Object} [options]
+   *  - {Boolean} immutable
+   *  - {Boolean} merge
+   * @returns {void}
+   */
+  setAll(keys, options) {
+    if (!this.isWritable) {
+      return;
     }
-    if (isPlainObject(key)) {
-      for (const k in key) {
-        this._handledMethods.set(k, key[k], options);
-      }
-    }
-    if (Array.isArray(key)) {
-      for (let i = 0, n = key.length; i < n; i++) {
-        this._handledMethods.set(...key[i]);
-      }
-    }
+    return this._handledMethods.setAll(keys, options);
   }
 
   /**
@@ -169,17 +177,21 @@ module.exports = class DataStore extends Emitter {
 
   /**
    * Retrieve reference to value stored at 'key'
-   * Array of keys returns array of references
-   * @param {String|Array} [key]
-   * @returns {String|Array}
+   * @param {String} [key]
+   * @returns {String}
    */
   reference(key) {
-    if (!key || typeof key === 'string') {
-      return reference(this, key);
-    }
-    if (Array.isArray(key)) {
-      return key.map(k => reference(this, k));
-    }
+    return reference(this, key);
+  }
+
+  /**
+   * Batch version of 'reference()'
+   * Accepts array of 'keys'
+   * @param {Array<String>} keys
+   * @returns {Array<String>}
+   */
+  referenceAll(keys) {
+    return reference.all(this, keys);
   }
 
   /**
@@ -232,23 +244,27 @@ module.exports = class DataStore extends Emitter {
 
   /**
    * Store serialisability of 'key'
-   * @param {String|Object} key
+   * @param {String} key
    * @param {Boolean} value
    */
   setSerialisabilityOfKey(key, value) {
-    // Handle batch
-    if (isPlainObject(key)) {
-      for (const k in key) {
-        this.setSerialisabilityOfKey(k, key[k]);
-      }
-      return;
-    }
-
     if (key.charAt(0) === '/') {
       key = key.slice(1);
     }
-
     this._serialisableKeys[key] = value;
+  }
+
+  /**
+   * Batch version of 'setSerialisabilityOfKey()'
+   * Accepts hash of key/value pairs
+   * @param {Object} keys
+   */
+  setSerialisabilityOfKeys(keys) {
+    if (isPlainObject(keys)) {
+      for (const key in keys) {
+        this.setSerialisabilityOfKey(key, keys[key]);
+      }
+    }
   }
 
   /**
