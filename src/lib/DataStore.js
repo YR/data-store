@@ -3,13 +3,11 @@
 const assign = require('object-assign');
 const Cursor = require('./DataStoreCursor');
 const debugFactory = require('debug');
-const Emitter = require('eventemitter3');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
 const reference = require('./methods/reference');
 const set = require('./methods/set');
-const update = require('./methods/update');
 
 const HANDLED_METHODS = {
   reset: [reset, ['data']],
@@ -20,7 +18,7 @@ const REF_KEY = '__ref:';
 
 let uid = 0;
 
-module.exports = class DataStore extends Emitter {
+module.exports = class DataStore {
   /**
    * Constructor
    * @param {String} [id]
@@ -31,8 +29,6 @@ module.exports = class DataStore extends Emitter {
    *  - {Object} serialisableKeys
    */
   constructor(id, data, options = {}) {
-    super();
-
     this.REF_KEY = REF_KEY;
 
     this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
@@ -160,22 +156,6 @@ module.exports = class DataStore extends Emitter {
   }
 
   /**
-   * Store 'value' at 'key', notifying listeners of change
-   * Allows passing of arbitrary additional args to listeners
-   * Hash of 'key:value' pairs batches changes
-   * @param {String|Object} key
-   * @param {Object} value
-   * @param {Object} [options]
-   *  - {Boolean} merge
-   */
-  update(key, value, options, ...args) {
-    if (!this.isWritable || !key) {
-      return;
-    }
-    update(this, key, value, options, ...args);
-  }
-
-  /**
    * Retrieve reference to value stored at 'key'
    * @param {String} [key]
    * @returns {String}
@@ -215,7 +195,6 @@ module.exports = class DataStore extends Emitter {
     this._data = {};
     this._handlers = [];
     this._serialisableKeys = {};
-    this.removeAllListeners();
     this.debug('destroyed');
   }
 

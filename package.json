@@ -5,13 +5,11 @@
   "author": "Alexander Pope <alexander.pope@nrk.no>",
   "dependencies": {
     "@yr/agent": "5.0.x",
-    "@yr/clock": "1.1.x",
     "@yr/keys": "1.1.x",
     "@yr/property": "7.0.x",
     "@yr/runtime": "2.0.x",
     "@yr/url-utils": "2.3.x",
     "debug": "2.6.x",
-    "eventemitter3": "2.0.x",
     "is-plain-obj": "1.1.x",
     "object-assign": "4.1.x"
   },
