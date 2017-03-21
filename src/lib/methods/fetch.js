@@ -120,7 +120,7 @@ function doFetch(store, key, url, options) {
           if (!staleIfError) {
             return reject(err);
           }
-          resolve({
+          return resolve({
             body: value,
             duration: 0,
             error: err,
@@ -178,7 +178,7 @@ function load(store, key, url, options) {
 
       // Guard against empty data
       if (res.body) {
-        let data = res.body;
+        const data = res.body;
 
         // Add expires header
         if (res.headers && 'expires' in res.headers) {

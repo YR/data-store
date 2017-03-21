@@ -3,13 +3,11 @@
 const assign = require('object-assign');
 const Cursor = require('./DataStoreCursor');
 const debugFactory = require('debug');
-const Emitter = require('eventemitter3');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
 const reference = require('./methods/reference');
 const set = require('./methods/set');
-const update = require('./methods/update');
 
 const HANDLED_METHODS = {
   reset: [reset, ['data']],
@@ -20,7 +18,7 @@ const REF_KEY = '__ref:';
 
 let uid = 0;
 
-module.exports = class DataStore extends Emitter {
+module.exports = class DataStore {
   /**
    * Constructor
    * @param {String} [id]
@@ -31,8 +29,6 @@ module.exports = class DataStore extends Emitter {
    *  - {Object} serialisableKeys
    */
   constructor(id, data, options = {}) {
-    super();
-
     this.REF_KEY = REF_KEY;
 
     this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
@@ -40,6 +36,7 @@ module.exports = class DataStore extends Emitter {
     this.id = id || `store${++uid}`;
     this.isWritable = 'isWritable' in options ? options.isWritable : true;
 
+    this._actions = {};
     this._cursors = {};
     this._data = {};
     this._handledMethods = {};
@@ -55,7 +52,10 @@ module.exports = class DataStore extends Emitter {
       this._registerHandledMethod(methodName, ...handledMethods[methodName]);
     }
     if (options.handlers) {
-      this.use(options.handlers);
+      this.useHandler(options.handlers);
+    }
+    if (options.actions) {
+      this.registerAction(options.actions);
     }
 
     this.reset(data || {});
@@ -67,20 +67,24 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String|Array} [match]
    * @param {Function} handler
    */
-  use(match, handler) {
-    const matches = !Array.isArray(match) ? [[match, handler]] : match;
+  useHandler(match, handler) {
+    const handlers = !Array.isArray(match) ? [[match, handler]] : match;
+    let count = 0;
 
-    const handlers = this._handlers.map(({ handler }) => handler);
-
-    matches.forEach(([match, handler]) => {
+    handlers.forEach(([match, handler]) => {
       if (typeof match === 'function') {
         handler = match;
         match = '';
       }
       if (typeof handler === 'function') {
         this._handlers.push({ handler, match });
+        count++;
       }
     });
+
+    if (count) {
+      this.debug(`using ${count} new handler${count > 1 ? 's' : ''}`);
+    }
   }
 
   /**
@@ -88,7 +92,7 @@ module.exports = class DataStore extends Emitter {
    * @param {RegExp|String|Array} [match]
    * @param {Function} handler
    */
-  unuse(match, handler) {
+  unuseHandler(match, handler) {
     const matches = !Array.isArray(match) ? [[match, handler]] : match;
 
     for (let i = 0, n = matches.length; i < n; i++) {
@@ -104,6 +108,48 @@ module.exports = class DataStore extends Emitter {
           this._handlers.splice(j, 1);
         }
       }
+    }
+  }
+
+  /**
+   * Register 'action' under 'name'
+   * @param {String|Array} name
+   * @param {Function} action
+   */
+  registerAction(name, action) {
+    const names = !Array.isArray(name) ? [[name, action]] : name;
+
+    names.forEach(([name, action]) => {
+      if (typeof action === 'function') {
+        this._actions[name] = action;
+        this.debug(`registered ${name} action`);
+      }
+    });
+  }
+
+  /**
+   * Unregister 'name' action
+   * @param {String} name
+   */
+  unregisterAction(name) {
+    if (this._actions[name]) {
+      delete this._actions[name];
+    }
+  }
+
+  /**
+   * Trigger registered action with optional 'args
+   * @param {String} name
+   * @param {Array} [args]
+   */
+  trigger(name, ...args) {
+    const action = this._actions[name];
+
+    if (action) {
+      this.debug(`triggering ${name} action`);
+      action(this, ...args);
+    } else {
+      this.debug(`action ${name} not registered`);
     }
   }
 
@@ -140,7 +186,7 @@ module.exports = class DataStore extends Emitter {
     if (!this.isWritable) {
       return;
     }
-    return this._handledMethods.set(key, value, options);
+    this._handledMethods.set(key, value, options);
   }
 
   /**
@@ -156,23 +202,7 @@ module.exports = class DataStore extends Emitter {
     if (!this.isWritable) {
       return;
     }
-    return this._handledMethods.setAll(keys, options);
-  }
-
-  /**
-   * Store 'value' at 'key', notifying listeners of change
-   * Allows passing of arbitrary additional args to listeners
-   * Hash of 'key:value' pairs batches changes
-   * @param {String|Object} key
-   * @param {Object} value
-   * @param {Object} [options]
-   *  - {Boolean} merge
-   */
-  update(key, value, options, ...args) {
-    if (!this.isWritable || !key) {
-      return;
-    }
-    update(this, key, value, options, ...args);
+    this._handledMethods.setAll(keys, options);
   }
 
   /**
@@ -211,11 +241,11 @@ module.exports = class DataStore extends Emitter {
       this._cursors[key].destroy();
     }
     this.destroyed = true;
+    this._actions = {};
     this._cursors = {};
     this._data = {};
     this._handlers = [];
     this._serialisableKeys = {};
-    this.removeAllListeners();
     this.debug('destroyed');
   }
 
@@ -459,7 +489,7 @@ function reset(store, data) {
  */
 function serialise(key, data, config) {
   if (isPlainObject(data)) {
-    let obj = {};
+    const obj = {};
 
     for (const prop in data) {
       const keyChain = key ? `${key}/${prop}` : prop;
@@ -468,7 +498,7 @@ function serialise(key, data, config) {
       if (config[keyChain] !== false) {
         if (isPlainObject(value)) {
           obj[prop] = serialise(keyChain, value, config);
-        } else if (value !== null && typeof value === 'object' && 'toJSON' in value) {
+        } else if (value != null && typeof value === 'object' && 'toJSON' in value) {
           obj[prop] = value.toJSON();
         } else {
           obj[prop] = value;
@@ -490,7 +520,7 @@ function serialise(key, data, config) {
  */
 function explode(store, data) {
   if (isPlainObject(data)) {
-    let obj = {};
+    const obj = {};
 
     for (const prop in data) {
       obj[prop] = explode(store, data[prop]);

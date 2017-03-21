@@ -3,7 +3,6 @@
 const agent = require('@yr/agent');
 const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
-const isPlainObject = require('is-plain-obj');
 const runtime = require('@yr/runtime');
 
 const GRACE = 10000;

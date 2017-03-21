@@ -119,83 +119,6 @@ describe('DataStore', () => {
     });
   });
 
-  describe('update()', () => {
-    it('should set a value for "key"', () => {
-      store.update('bar', 'bar');
-      expect(store.get('bar')).to.equal('bar');
-    });
-    it('should allow batch writes', () => {
-      store.update({ bar: 'bar', foo: 'bar' });
-      expect(store.get('bar')).to.equal('bar');
-      expect(store.get('foo')).to.equal('bar');
-    });
-    it('should allow array batch writes', () => {
-      store.update([['bar', 'bar'], ['foo', 'bar']]);
-      expect(store.get('bar')).to.equal('bar');
-      expect(store.get('foo')).to.equal('bar');
-    });
-    it('should notify listeners', done => {
-      store.on('update', (key, value, oldValue) => {
-        expect(key).to.equal('bar');
-        expect(store.get(key)).to.equal(value);
-        expect(oldValue).to.equal('bat');
-        done();
-      });
-      store.update('bar', 'bar');
-    });
-    it('should notify listeners of specific property', done => {
-      store.on('update:foo/bar', (value, oldValue) => {
-        expect(value).to.equal('bar');
-        expect(oldValue).to.equal('foo');
-        done();
-      });
-      store.update('foo/bar', 'bar');
-    });
-    it('should allow passing of additional arguments to listeners', done => {
-      store.on('update', (key, value, oldValue, options, foo, bool) => {
-        expect(oldValue).to.equal('bat');
-        expect(foo).to.equal('foo');
-        expect(bool).to.be(true);
-        done();
-      });
-      store.update('bar', 'bar', null, 'foo', true);
-    });
-    it('should allow passing of additional arguments to listeners for batch writes', done => {
-      const obj = { bar: 'bar', boo: 'boo' };
-      let i = 0;
-
-      store.on('update', (key, value, oldValue, options, foo) => {
-        expect(foo).to.equal('foo');
-        if (++i == 2) {
-          done();
-        }
-      });
-      store.update(obj, null, null, 'foo');
-    });
-    it('should allow passing of additional arguments to listeners for array batch writes', done => {
-      const arr = [['bar', 'bar', null, 'foo'], ['boo', 'boo', null, 'bar']];
-      let i = 0;
-
-      store.on('update', (key, value, oldValue, options, extra) => {
-        if (key == 'bar') {
-          expect(extra).to.equal('foo');
-        }
-        if (key == 'boo') {
-          expect(extra).to.equal('bar');
-        }
-        if (++i == 2) {
-          done();
-        }
-      });
-      store.update(arr);
-    });
-    it('should be ignored if dataStore is not "isWritable"', () => {
-      store.isWritable = false;
-      store.update('bar', 'bar');
-      expect(store.get('bar')).to.not.equal('bar');
-    });
-  });
-
   describe('reference()', () => {
     it('should return a key reference', () => {
       expect(store.reference('bar')).to.equal('__ref:bar');
@@ -277,48 +200,15 @@ describe('DataStore', () => {
       });
     });
 
-    describe('update()', () => {
-      it('should set a value for "key" of a cursor', () => {
-        const cursor = store.createCursor('foo');
+    describe('trigger()', () => {
+      it('should defer to store.trigger()', () => {
+        const cursor = store.createCursor();
 
-        cursor.update('bar', 'bar');
-        expect(store.get('foo/bar')).to.equal('bar');
-      });
-      it('should set a root value for empty "key" of a cursor', () => {
-        const cursor = store.createCursor('foo');
-
-        cursor.update(null, { bar: 'bar' });
-        expect(store.get('foo/bar')).to.equal('bar');
-      });
-      it('should remove a cursor key when null value specified', () => {
-        const cursor = store.createCursor('foo');
-
-        cursor.update();
-        expect(store.get('foo/bar')).to.equal(undefined);
-        expect(store._data).to.not.have.property('foo');
-      });
-      it('should allow batch writes', () => {
-        const cursor = store.createCursor('foo/boo');
-        const obj = {
-          bar: 'bar',
-          'boop/bar': [],
-          '/bar': 'bar'
-        };
-
-        cursor.update(obj);
-        expect(store.createCursor('foo/boo').get('bar')).to.equal('bar');
-        expect(store.get('bar')).to.equal('bar');
-      });
-      it('should notify listeners on update of a cursor', done => {
-        const cursor = store.createCursor('foo');
-
-        store.on('update', (key, value, oldValue) => {
-          expect(key).to.equal('foo/bar');
-          expect(oldValue).to.equal('foo');
-          expect(store.get(key)).to.equal(value);
-          done();
+        store.registerAction('foo', store => {
+          store.set('foo', 'foo');
         });
-        cursor.update('bar', 'bar');
+        cursor.trigger('foo');
+        expect(store.get('foo')).to.equal('foo');
       });
     });
   });
@@ -398,23 +288,23 @@ describe('DataStore', () => {
     });
   });
 
-  describe('handling', () => {
+  describe('handlers', () => {
     it('should ignore invalid handlers', () => {
-      store.use();
-      store.use(true);
-      store.use(false);
-      store.use(null);
-      store.use(undefined);
-      store.use('foo', true);
-      store.use('foo', false);
-      store.use('foo', null);
-      store.use('foo', undefined);
+      store.useHandler();
+      store.useHandler(true);
+      store.useHandler(false);
+      store.useHandler(null);
+      store.useHandler(undefined);
+      store.useHandler('foo', true);
+      store.useHandler('foo', false);
+      store.useHandler('foo', null);
+      store.useHandler('foo', undefined);
       expect(store._handlers).to.eql([]);
     });
     it('should allow middleware', () => {
       let run = 0;
 
-      store.use(context => {
+      store.useHandler(context => {
         run++;
         expect(context.method).to.equal('reset');
       });
@@ -424,7 +314,7 @@ describe('DataStore', () => {
     it('should allow delegation', () => {
       let run = 0;
 
-      store.use(/zing/, context => {
+      store.useHandler(/zing/, context => {
         run++;
         context.value = 'bar';
         expect(context.key).to.equal('zing');
@@ -437,7 +327,7 @@ describe('DataStore', () => {
     it('should allow handling with option merging', () => {
       let run = 0;
 
-      store.use(/foo/, context => {
+      store.useHandler(/foo/, context => {
         run++;
         context.merge('options', { merge: false });
         expect(context.key).to.equal('foo');
@@ -449,30 +339,27 @@ describe('DataStore', () => {
     it('should allow multiple handlers', () => {
       let run = 0;
 
-      store.use(/zing/, context => {
+      store.useHandler(/zing/, context => {
         run++;
         context.value = 'bar';
       });
-      store.use(/zing/, context => {
+      store.useHandler(/zing/, context => {
         run++;
       });
       store.set('zing', 'foo');
       expect(store._data.zing).to.equal('bar');
       expect(run).to.equal(2);
     });
-  });
-
-  describe('unhandling', () => {
     it('should remove a single handler', () => {
       let run = 0;
       const fn = context => {
         run++;
       };
 
-      store.use(fn);
+      store.useHandler(fn);
       store.set('bar', 'boo');
       expect(run).to.equal(1);
-      store.unuse(fn);
+      store.unuseHandler(fn);
       store.set('bar', 'boop');
       expect(run).to.equal(1);
     });
@@ -491,12 +378,41 @@ describe('DataStore', () => {
         ]
       ];
 
-      store.use(handlers);
+      store.useHandler(handlers);
       store.set('bar', 'boo');
       expect(run).to.equal(2);
-      store.unuse(handlers);
+      store.unuseHandler(handlers);
       store.set('bar', 'boop');
       expect(run).to.equal(2);
+    });
+  });
+
+  describe('actions', () => {
+    it('should trigger nothing if no action registered', () => {
+      store.trigger('bar');
+      expect(store.get('bar')).to.equal('bat');
+    });
+    it('should register an action', () => {
+      store.registerAction('foo', store => {
+        store.set('foo', 'foo');
+      });
+      store.trigger('foo');
+      expect(store.get('foo')).to.equal('foo');
+    });
+    it('should register an action with passed arguments', () => {
+      store.registerAction('foo', (store, bar) => {
+        store.set('foo', bar);
+      });
+      store.trigger('foo', 'bar');
+      expect(store.get('foo')).to.equal('bar');
+    });
+    it('should unregister an action', () => {
+      store.registerAction('foo', store => {
+        store.set('foo', 'foo');
+      });
+      expect(store._actions).to.have.property('foo');
+      store.unregisterAction('foo');
+      expect(store._actions).to.not.have.property('foo');
     });
   });
 });
