@@ -54,6 +54,9 @@ module.exports = class DataStore {
     if (options.handlers) {
       this.useHandler(options.handlers);
     }
+    if (options.actions) {
+      this.registerAction(options.actions);
+    }
 
     this.reset(data || {});
   }
