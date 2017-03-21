@@ -117,9 +117,9 @@ module.exports = class DataStore {
    * @param {Function} action
    */
   registerAction(name, action) {
-    const actions = !Array.isArray(action) ? [[name, action]] : name;
+    const names = !Array.isArray(name) ? [[name, action]] : name;
 
-    actions.forEach(([name, action]) => {
+    names.forEach(([name, action]) => {
       if (typeof action === 'function') {
         this._actions[name] = action;
         this.debug(`registered ${name} action`);
