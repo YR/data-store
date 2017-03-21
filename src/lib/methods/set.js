@@ -11,18 +11,20 @@ const DEFAULT_OPTIONS = {
   merge: true
 };
 
+module.exports = set;
+module.exports.all = setAll;
+
 /**
  * Store 'value' at 'key'
- * Hash of 'key:value' pairs batches changes
  * @param {DataStore} store
- * @param {String|Object} key
+ * @param {String} key
  * @param {*} value
  * @param {Object} [options]
  *  - {Boolean} immutable
  *  - {Boolean} merge
- * @returns {null}
+ * @returns {void}
  */
-module.exports = function set(store, key, value, options) {
+function set(store, key, value, options) {
   if (!key) {
     return;
   }
@@ -30,7 +32,7 @@ module.exports = function set(store, key, value, options) {
   options = assign({}, DEFAULT_OPTIONS, options);
 
   if (typeof key === 'string') {
-    return doSet(store, key, value, options);
+    return void doSet(store, key, value, options);
   }
   if (isPlainObject(key)) {
     for (const k in key) {
@@ -44,7 +46,26 @@ module.exports = function set(store, key, value, options) {
       doSet(store, k, v, assign({}, DEFAULT_OPTIONS, o));
     }
   }
-};
+}
+
+/**
+ * Batch version of 'set()'
+ * Accepts hash of key/value pairs
+ * @param {DataStore} store
+ * @param {Object} keys
+ * @param {Object} [options]
+ *  - {Boolean} immutable
+ *  - {Boolean} merge
+ */
+function setAll(store, keys, options) {
+  options = assign({}, DEFAULT_OPTIONS, options);
+
+  if (isPlainObject(keys)) {
+    for (const key in keys) {
+      doSet(store, key, keys[key], options);
+    }
+  }
+}
 
 /**
  * Store 'value' at 'key'
