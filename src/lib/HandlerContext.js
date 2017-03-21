@@ -20,7 +20,7 @@ module.exports = class HandlerContext {
     for (let i = 0, n = signature.length; i < n; i++) {
       let prop = signature[i];
 
-      if (prop.indexOf('...') == 0) {
+      if (prop.indexOf('...') === 0) {
         prop = prop.slice(3);
         this[prop] = args.slice(i);
       } else {
@@ -46,12 +46,12 @@ module.exports = class HandlerContext {
    * @returns {Array}
    */
   toArguments() {
-    let args = [];
+    const args = [];
 
     for (let i = 0, n = this.signature.length; i < n; i++) {
       let prop = this.signature[i];
 
-      if (prop.indexOf('...') == 0) {
+      if (prop.indexOf('...') === 0) {
         prop = prop.slice(3);
         args.push(...this[prop]);
       } else {

@@ -183,7 +183,7 @@ module.exports = class DataStore {
     if (!this.isWritable) {
       return;
     }
-    return this._handledMethods.set(key, value, options);
+    this._handledMethods.set(key, value, options);
   }
 
   /**
@@ -199,7 +199,7 @@ module.exports = class DataStore {
     if (!this.isWritable) {
       return;
     }
-    return this._handledMethods.setAll(keys, options);
+    this._handledMethods.setAll(keys, options);
   }
 
   /**
@@ -486,7 +486,7 @@ function reset(store, data) {
  */
 function serialise(key, data, config) {
   if (isPlainObject(data)) {
-    let obj = {};
+    const obj = {};
 
     for (const prop in data) {
       const keyChain = key ? `${key}/${prop}` : prop;
@@ -495,7 +495,7 @@ function serialise(key, data, config) {
       if (config[keyChain] !== false) {
         if (isPlainObject(value)) {
           obj[prop] = serialise(keyChain, value, config);
-        } else if (value !== null && typeof value === 'object' && 'toJSON' in value) {
+        } else if (value != null && typeof value === 'object' && 'toJSON' in value) {
           obj[prop] = value.toJSON();
         } else {
           obj[prop] = value;
@@ -517,7 +517,7 @@ function serialise(key, data, config) {
  */
 function explode(store, data) {
   if (isPlainObject(data)) {
-    let obj = {};
+    const obj = {};
 
     for (const prop in data) {
       obj[prop] = explode(store, data[prop]);
