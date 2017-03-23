@@ -118,13 +118,18 @@ module.exports = class DataStore {
    */
   registerAction(name, action) {
     const names = !Array.isArray(name) ? [[name, action]] : name;
+    let count = 0;
 
     names.forEach(([name, action]) => {
       if (typeof action === 'function') {
         this._actions[name] = action;
-        this.debug(`registered ${name} action`);
+        count++;
       }
     });
+
+    if (count) {
+      this.debug(`registered ${count} new action${count > 1 ? 's' : ''}`);
+    }
   }
 
   /**
