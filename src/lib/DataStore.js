@@ -135,12 +135,17 @@ module.exports = class DataStore {
 
   /**
    * Unregister 'name' action
-   * @param {String} name
+   * @param {String|Array} name
+   * @param {Function} action
    */
-  unregisterAction(name) {
-    if (this._actions[name]) {
-      delete this._actions[name];
-    }
+  unregisterAction(name, action) {
+    const names = !Array.isArray(name) ? [[name, action]] : name;
+
+    names.forEach(([name]) => {
+      if (this._actions[name]) {
+        delete this._actions[name];
+      }
+    });
   }
 
   /**
