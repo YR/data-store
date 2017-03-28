@@ -1,6 +1,6 @@
 'use strict';
 
-const keys = require('@yr/keys');
+const { join } = require('@yr/keys');
 
 module.exports = class DataStoreCursor {
   /**
@@ -17,24 +17,34 @@ module.exports = class DataStoreCursor {
   /**
    * Retrieve value stored at 'key'
    * Empty 'key' returns all data
-   * Array of keys returns array of values
-   * @param {String|Array} [key]
+   * @param {String} [key]
    * @returns {*}
    */
   get(key) {
-    const fixKey = key => {
-      // Prefix with cursor key if not root
-      return !this._isRootKey(key) ? keys.join(this.key, key) : key;
-    };
-
     // Handle empty key (set value at cursor root)
     if (!key) {
       key = this.key;
     }
-    // Handle array of keys
-    key = Array.isArray(key) ? key.map(fixKey) : fixKey(key);
+
+    // Prefix with cursor key if not root
+    key = !this._isRootKey(key) ? join(this.key, key) : key;
 
     return this.dataStore.get(key);
+  }
+
+  /**
+   * Batch version of 'get()'
+   * Accepts array of 'keys'
+   * @param {Array} keys
+   * @returns {Array}
+   */
+  getAll(keys) {
+    return keys.map(key => {
+      // Prefix with cursor key if not root
+      key = !this._isRootKey(key) ? join(this.key, key) : key;
+
+      return this.dataStore.get(key);
+    });
   }
 
   /**
@@ -43,7 +53,7 @@ module.exports = class DataStoreCursor {
    * @returns {DataStoreCursor}
    */
   createCursor(key) {
-    return this.dataStore.createCursor(keys.join(this.key, key));
+    return this.dataStore.createCursor(join(this.key, key));
   }
 
   /**

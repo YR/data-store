@@ -215,6 +215,14 @@ describe('DataStore', () => {
       });
     });
 
+    describe('getAll()', () => {
+      it('should return an array of values', () => {
+        const cursor = store.createCursor('foo');
+
+        expect(cursor.getAll(['bar', 'bat'])).to.eql(['foo', 'bat']);
+      });
+    });
+
     describe('trigger()', () => {
       it('should defer to store.trigger()', () => {
         const cursor = store.createCursor();
