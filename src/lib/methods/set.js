@@ -25,27 +25,7 @@ module.exports.all = setAll;
  * @returns {void}
  */
 function set(store, key, value, options) {
-  if (!key) {
-    return;
-  }
-
-  options = assign({}, DEFAULT_OPTIONS, options);
-
-  if (typeof key === 'string') {
-    return void doSet(store, key, value, options);
-  }
-  if (isPlainObject(key)) {
-    for (const k in key) {
-      doSet(store, k, key[k], options);
-    }
-  }
-  if (Array.isArray(key)) {
-    for (let i = 0, n = key.length; i < n; i++) {
-      const [k, v, o = {}] = key[i];
-
-      doSet(store, k, v, assign({}, DEFAULT_OPTIONS, o));
-    }
-  }
+  store.changed = doSet(store, key, value, assign({}, DEFAULT_OPTIONS, options));
 }
 
 /**
@@ -58,13 +38,18 @@ function set(store, key, value, options) {
  *  - {Boolean} merge
  */
 function setAll(store, keys, options) {
-  options = assign({}, DEFAULT_OPTIONS, options);
+  let changed = false;
 
   if (isPlainObject(keys)) {
+    options = assign({}, DEFAULT_OPTIONS, options);
     for (const key in keys) {
-      doSet(store, key, keys[key], options);
+      if (doSet(store, key, keys[key], options)) {
+        changed = true;
+      }
     }
   }
+
+  store.changed = changed;
 }
 
 /**
@@ -75,22 +60,23 @@ function setAll(store, keys, options) {
  * @param {Object} [options]
  *  - {Boolean} immutable
  *  - {Boolean} merge
+ * @returns {Boolean}
  */
 function doSet(store, key, value, options) {
-  // Resolve back to original key if referenced
-  key = store._resolveRefKey(key);
+  if (!key || typeof key !== 'string') {
+    return false;
+  }
+
+  // Returns same if no change
+  const newData = property.set(store._data, key, value, options);
 
   if (options.immutable) {
-    // Returns same if no change
-    const newData = property.set(store._data, key, value, options);
-
     if (newData !== store._data) {
       store._data = newData;
     } else {
       store.debug('WARNING no change after set "%s', key);
+      return false;
     }
-    return;
   }
-
-  property.set(store._data, key, value, options);
+  return true;
 }

@@ -102,9 +102,24 @@ describe('DataStore', () => {
       store.set('foo', 'bar');
       expect(store._data.foo).to.equal('bar');
     });
-    it('should update the original referenced value', () => {
+    it('should not update the original referenced value', () => {
       store.set('foo/boo/bar', 'bar');
-      expect(store._data.boo.bar).to.equal('bar');
+      expect(store._data.foo.boo.bar).to.equal('bar');
+    });
+    it('should create new object when immutable', () => {
+      const data = store._data;
+
+      store.set('foo', 'bar', { immutable: true });
+      expect(store._data.foo).to.equal('bar');
+      expect(store._data).to.not.equal(data);
+      expect(store.changed).to.equal(true);
+    });
+    it('should not create new object when immutable if no change', () => {
+      const data = store._data;
+
+      store.set('bar', 'bat', { immutable: true });
+      expect(store._data).to.equal(data);
+      expect(store.changed).to.equal(false);
     });
   });
 

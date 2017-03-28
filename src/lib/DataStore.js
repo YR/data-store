@@ -31,6 +31,7 @@ module.exports = class DataStore {
   constructor(id, data, options = {}) {
     this.REF_KEY = REF_KEY;
 
+    this.changed = false;
     this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
@@ -483,6 +484,7 @@ module.exports = class DataStore {
 function reset(store, data) {
   store.debug('reset');
   store._data = data;
+  store.changed = true;
 }
 
 /**

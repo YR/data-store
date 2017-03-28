@@ -142,15 +142,11 @@ async@1.5.2:
   version "1.5.2"
   resolved "https://registry.yarnpkg.com/async/-/async-1.5.2.tgz#ec6a61ae56480c0c3cb241c95618e20892f9672a"
 
-async@2.1.5:
-  version "2.1.5"
-  resolved "https://registry.yarnpkg.com/async/-/async-2.1.5.tgz#e587c68580994ac67fc56ff86d3ac56bdbe810bc"
+async@2.2.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/async/-/async-2.2.0.tgz#c324eba010a237e4fbd55a12dee86367d5c0ef32"
   dependencies:
     lodash "^4.14.0"
-
-async@~0.2.6:
-  version "0.2.10"
-  resolved "https://registry.yarnpkg.com/async/-/async-0.2.10.tgz#b6bbe0b0674b9d719708ca38de8c237cb526c3d1"
 
 asynckit@^0.4.0:
   version "0.4.0"
@@ -653,12 +649,12 @@ browser-stdout@1.3.0:
   version "1.3.0"
   resolved "https://registry.yarnpkg.com/browser-stdout/-/browser-stdout-1.3.0.tgz#f351d32969d32fa5d7a5567154263d928ae3bd1f"
 
-browserslist@1.7.6, browserslist@^1.0.1, browserslist@^1.5.2, browserslist@^1.7.6:
-  version "1.7.6"
-  resolved "https://registry.yarnpkg.com/browserslist/-/browserslist-1.7.6.tgz#af98589ce6e7ab09618d29451faacb81220bd3ba"
+browserslist@1.7.7, browserslist@^1.0.1, browserslist@^1.5.2, browserslist@^1.7.6:
+  version "1.7.7"
+  resolved "https://registry.yarnpkg.com/browserslist/-/browserslist-1.7.7.tgz#0bd76704258be829b2398bb50e4b62d1a166b0b9"
   dependencies:
-    caniuse-db "^1.0.30000631"
-    electron-to-chromium "^1.2.5"
+    caniuse-db "^1.0.30000639"
+    electron-to-chromium "^1.2.7"
 
 buble@^0.12.0:
   version "0.12.5"
@@ -688,22 +684,22 @@ buddy-cli@6.1.0:
     signal-exit "3.0.1"
 
 buddy@6.x.x:
-  version "6.13.2"
-  resolved "https://registry.yarnpkg.com/buddy/-/buddy-6.13.2.tgz#de3f422553172d723cc29aae9a3814b418f9590d"
+  version "6.13.4"
+  resolved "https://registry.yarnpkg.com/buddy/-/buddy-6.13.4.tgz#f5f0ee363537f1ff1a147129782f24c396dd5a8e"
   dependencies:
-    async "2.1.5"
+    async "2.2.0"
     autoprefixer "6.7.7"
     babel-core "6.24.0"
     babel-plugin-external-helpers "6.22.0"
     babel-plugin-minify-dead-code-elimination "0.1.4"
     babel-plugin-transform-es2015-modules-commonjs "6.24.0"
-    browserslist "1.7.6"
+    browserslist "1.7.7"
     buddy-cli "6.1.0"
     chalk "1.1.3"
     chokidar "1.6.1"
     cssnano "3.10.0"
     glob "7.1.1"
-    inline-source "5.2.0"
+    inline-source "5.2.1"
     lodash "4.17.4"
     md5 "2.2.1"
     minimatch "3.0.3"
@@ -712,7 +708,7 @@ buddy@6.x.x:
     pretty-bytes "4.0.2"
     recur-fs "2.2.4"
     source-map "0.5.6"
-    uglify-js "2.8.14"
+    uglify-js "2.8.16"
 
 buffer-shims@^1.0.0:
   version "1.0.0"
@@ -731,9 +727,9 @@ caniuse-api@^1.5.2:
     lodash.memoize "^4.1.0"
     lodash.uniq "^4.3.0"
 
-caniuse-db@^1.0.30000346, caniuse-db@^1.0.30000631, caniuse-db@^1.0.30000634:
-  version "1.0.30000639"
-  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000639.tgz#5982f70a54352adaf8901a772d2c68ca24f501aa"
+caniuse-db@^1.0.30000346, caniuse-db@^1.0.30000634, caniuse-db@^1.0.30000639:
+  version "1.0.30000644"
+  resolved "https://registry.yarnpkg.com/caniuse-db/-/caniuse-db-1.0.30000644.tgz#9d7eccf1ef1d11cbd6741b9fb390f9923ff42261"
 
 caseless@~0.12.0:
   version "0.12.0"
@@ -876,8 +872,8 @@ console-control-strings@^1.0.0, console-control-strings@~1.1.0:
   resolved "https://registry.yarnpkg.com/console-control-strings/-/console-control-strings-1.1.0.tgz#3d7cf4464db6446ea644bf4b39507f9851008e8e"
 
 convert-source-map@^1.1.0:
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/convert-source-map/-/convert-source-map-1.4.0.tgz#e3dad195bf61bfe13a7a3c73e9876ec14a0268f3"
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/convert-source-map/-/convert-source-map-1.5.0.tgz#9acd70851c6d5dfdd93d9282e5edf94a03ff46b5"
 
 cookiejar@^2.0.6:
   version "2.1.0"
@@ -904,6 +900,12 @@ cryptiles@2.x.x:
 css-color-names@0.0.4:
   version "0.0.4"
   resolved "https://registry.yarnpkg.com/css-color-names/-/css-color-names-0.0.4.tgz#808adc2e79cf84738069b646cb20ec27beb629e0"
+
+css-tree@1.0.0-alpha17:
+  version "1.0.0-alpha17"
+  resolved "https://registry.yarnpkg.com/css-tree/-/css-tree-1.0.0-alpha17.tgz#7ab95ab72c533917af8be54313fec81841c5223a"
+  dependencies:
+    source-map "^0.5.3"
 
 cssnano@3.10.0:
   version "3.10.0"
@@ -942,7 +944,13 @@ cssnano@3.10.0:
     postcss-value-parser "^3.2.3"
     postcss-zindex "^2.0.1"
 
-csso@2.3.x, csso@~2.3.1:
+csso@3.0.x:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/csso/-/csso-3.0.1.tgz#1469af5ee2ec509addadd8777aa0e45acb6b2f58"
+  dependencies:
+    css-tree "1.0.0-alpha17"
+
+csso@~2.3.1:
   version "2.3.2"
   resolved "https://registry.yarnpkg.com/csso/-/csso-2.3.2.tgz#ddd52c587033f49e94b71fc55569f252e8ff5f85"
   dependencies:
@@ -1045,9 +1053,9 @@ ecc-jsbn@~0.1.1:
   dependencies:
     jsbn "~0.1.0"
 
-electron-to-chromium@^1.2.5:
-  version "1.2.7"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.2.7.tgz#4f748061407e478c76256d04496972b71f647407"
+electron-to-chromium@^1.2.7:
+  version "1.2.8"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.2.8.tgz#22c2e6200d350da27d6050db7e3f6f85d18cf4ed"
 
 entities@^1.1.1, entities@~1.1.1:
   version "1.1.1"
@@ -1226,8 +1234,8 @@ glob@7.1.1, glob@^7.0.5:
     path-is-absolute "^1.0.0"
 
 globals@^9.0.0:
-  version "9.16.0"
-  resolved "https://registry.yarnpkg.com/globals/-/globals-9.16.0.tgz#63e903658171ec2d9f51b1d31de5e2b8dc01fb80"
+  version "9.17.0"
+  resolved "https://registry.yarnpkg.com/globals/-/globals-9.17.0.tgz#0c0ca696d9b9bb694d2e5470bd37777caad50286"
 
 graceful-fs@^4.1.2:
   version "4.1.11"
@@ -1334,16 +1342,16 @@ ini@~1.3.0:
   version "1.3.4"
   resolved "https://registry.yarnpkg.com/ini/-/ini-1.3.4.tgz#0537cb79daf59b59a1a517dff706c86ec039162e"
 
-inline-source@5.2.0:
-  version "5.2.0"
-  resolved "https://registry.yarnpkg.com/inline-source/-/inline-source-5.2.0.tgz#e31b148a828d2fabb3d7ac6476f5c8992d0350c7"
+inline-source@5.2.1:
+  version "5.2.1"
+  resolved "https://registry.yarnpkg.com/inline-source/-/inline-source-5.2.1.tgz#867fa4fa3e75b3a6dd904a12ef75fb222cf0c10a"
   dependencies:
-    csso "2.3.x"
+    csso "3.0.x"
     htmlparser2 "3.9.x"
     is-plain-obj "1.1.x"
     object-assign "4.1.x"
     svgo "0.7.x"
-    uglify-js "2.7.x"
+    uglify-js "2.8.x"
 
 invariant@^2.2.0:
   version "2.2.2"
@@ -1649,15 +1657,15 @@ micromatch@^2.1.5:
     parse-glob "^3.0.4"
     regex-cache "^0.4.2"
 
-mime-db@~1.26.0:
-  version "1.26.0"
-  resolved "https://registry.yarnpkg.com/mime-db/-/mime-db-1.26.0.tgz#eaffcd0e4fc6935cf8134da246e2e6c35305adff"
+mime-db@~1.27.0:
+  version "1.27.0"
+  resolved "https://registry.yarnpkg.com/mime-db/-/mime-db-1.27.0.tgz#820f572296bbd20ec25ed55e5b5de869e5436eb1"
 
 mime-types@^2.1.12, mime-types@~2.1.7:
-  version "2.1.14"
-  resolved "https://registry.yarnpkg.com/mime-types/-/mime-types-2.1.14.tgz#f7ef7d97583fcaf3b7d282b6f8b5679dab1e94ee"
+  version "2.1.15"
+  resolved "https://registry.yarnpkg.com/mime-types/-/mime-types-2.1.15.tgz#a4ebf5064094569237b8cf70046776d09fc92aed"
   dependencies:
-    mime-db "~1.26.0"
+    mime-db "~1.27.0"
 
 mime@^1.3.4:
   version "1.3.4"
@@ -2079,8 +2087,8 @@ punycode@^1.4.1:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-1.4.1.tgz#c0d5a63b2718800ad8e1eb0fa5269c84dd41845e"
 
 q@^1.1.2:
-  version "1.4.1"
-  resolved "https://registry.yarnpkg.com/q/-/q-1.4.1.tgz#55705bcd93c5f3673530c2c2cbc0c2b3addc286e"
+  version "1.5.0"
+  resolved "https://registry.yarnpkg.com/q/-/q-1.5.0.tgz#dd01bac9d06d30e6f219aecb8253ee9ebdc308f1"
 
 qs@^6.0.2, qs@^6.1.0, qs@~6.4.0:
   version "6.4.0"
@@ -2344,8 +2352,8 @@ strip-json-comments@~2.0.1:
   resolved "https://registry.yarnpkg.com/strip-json-comments/-/strip-json-comments-2.0.1.tgz#3c531942e908c2697c0ec344858c286c7ca0a60a"
 
 superagent@3.5.x:
-  version "3.5.1"
-  resolved "https://registry.yarnpkg.com/superagent/-/superagent-3.5.1.tgz#0a4faefda33677777888347dd7b4d21f410c871b"
+  version "3.5.2"
+  resolved "https://registry.yarnpkg.com/superagent/-/superagent-3.5.2.tgz#3361a3971567504c351063abeaae0faa23dbf3f8"
   dependencies:
     component-emitter "^1.2.0"
     cookiejar "^2.0.6"
@@ -2439,22 +2447,14 @@ type-detect@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/type-detect/-/type-detect-1.0.0.tgz#762217cc06db258ec48908a1298e8b95121e8ea2"
 
-uglify-js@2.7.x:
-  version "2.7.5"
-  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-2.7.5.tgz#4612c0c7baaee2ba7c487de4904ae122079f2ca8"
-  dependencies:
-    async "~0.2.6"
-    source-map "~0.5.1"
-    uglify-to-browserify "~1.0.0"
-    yargs "~3.10.0"
-
-uglify-js@2.8.14:
-  version "2.8.14"
-  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-2.8.14.tgz#25b15d1af39b21752ee33703adbf432e8bc8f77d"
+uglify-js@2.8.16, uglify-js@2.8.x:
+  version "2.8.16"
+  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-2.8.16.tgz#d286190b6eefc6fd65eb0ecac6551e0b0e8839a4"
   dependencies:
     source-map "~0.5.1"
-    uglify-to-browserify "~1.0.0"
     yargs "~3.10.0"
+  optionalDependencies:
+    uglify-to-browserify "~1.0.0"
 
 uglify-to-browserify@~1.0.0:
   version "1.0.2"
