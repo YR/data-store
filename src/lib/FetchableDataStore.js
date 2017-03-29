@@ -1,6 +1,7 @@
 'use strict';
 
 const agent = require('@yr/agent');
+const assign = require('object-assign');
 const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
 const runtime = require('@yr/runtime');
@@ -63,7 +64,17 @@ module.exports = class FetchableDataStore extends DataStore {
    * @returns {Promise<Array>}
    */
   fetchAll(keys, options) {
-    return this._handledMethods.fetchAll(keys, options);
+    if (Array.isArray(keys)) {
+      return Promise.all(
+        keys.map(args => {
+          const [key, url, opts = {}] = args;
+
+          return this._handledMethods.fetch(key, url, assign({}, options, opts));
+        })
+      );
+    }
+
+    return Promise.resolve([]);
   }
 
   /**

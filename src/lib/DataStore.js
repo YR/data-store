@@ -181,7 +181,7 @@ module.exports = class DataStore {
    * @returns {Array}
    */
   getAll(keys) {
-    return get.all(this, keys);
+    return keys.map(key => get(this, key));
   }
 
   /**
@@ -197,7 +197,8 @@ module.exports = class DataStore {
     if (!this.isWritable) {
       return;
     }
-    this._handledMethods.set(key, value, options);
+
+    this.changed = this._handledMethods.set(key, value, options);
   }
 
   /**
@@ -213,7 +214,18 @@ module.exports = class DataStore {
     if (!this.isWritable) {
       return;
     }
-    this._handledMethods.setAll(keys, options);
+
+    let changed = false;
+
+    if (isPlainObject(keys)) {
+      for (const key in keys) {
+        if (this._handledMethods.set(key, keys[key], options)) {
+          changed = true;
+        }
+      }
+    }
+
+   this.changed = changed;
   }
 
   /**
@@ -232,7 +244,7 @@ module.exports = class DataStore {
    * @returns {Array<String>}
    */
   referenceAll(keys) {
-    return reference.all(this, keys);
+    return keys.map(key => reference(this, key));
   }
 
   /**

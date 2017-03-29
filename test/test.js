@@ -347,6 +347,20 @@ describe('DataStore', () => {
       expect(run).to.equal(1);
       expect(store._data.zing).to.equal('bar');
     });
+    it('should allow delegation when using setAll', () => {
+      let run = 0;
+
+      store.useHandler(/zing/, context => {
+        run++;
+        context.value = 'bar';
+        expect(context.key).to.equal('zing');
+        expect(context.method).to.equal('set');
+      });
+      store.setAll({ zing: 'foo', zang: 'bar' });
+      expect(run).to.equal(1);
+      expect(store._data.zing).to.equal('bar');
+      expect(store._data.zang).to.equal('bar');
+    });
     it('should allow handling with option merging', () => {
       let run = 0;
 

@@ -12,7 +12,6 @@ const DEFAULT_LOAD_OPTIONS = {
 };
 
 module.exports = fetch;
-module.exports.all = fetchAll;
 
 /**
  * Fetch data. If expired, load from 'url' and store at 'key'
@@ -42,35 +41,6 @@ function fetch(store, key, url, options) {
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
 
   return doFetch(store, key, url, options);
-}
-
-/**
- * Batch version of 'fetch()'
- * Accepts an array of tuples [[key: String, url: String, options: Object]]
- * @param {DataStore} store
- * @param {Array<Array>} keys
- * @param {Object} [options]
- *  - {Boolean} abort
- *  - {Boolean} ignoreQuery
- *  - {Number} minExpiry
- *  - {Number} retry
- *  - {Boolean} staleWhileRevalidate
- *  - {Boolean} staleIfError
- *  - {Number} timeout
- * @returns {Promise<Array>}
- */
-function fetchAll(store, keys, options) {
-  if (Array.isArray(keys)) {
-    return Promise.all(
-      keys.map(args => {
-        const [key, url, opts = {}] = args;
-
-        return fetch(store, key, url, assign({}, options, opts));
-      })
-    );
-  }
-
-  return Promise.resolve([]);
 }
 
 /**

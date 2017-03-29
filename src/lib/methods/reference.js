@@ -1,7 +1,6 @@
 'use strict';
 
 module.exports = reference;
-module.exports.all = referenceAll;
 
 /**
  * Retrieve reference to value stored at 'key'
@@ -14,17 +13,6 @@ function reference(store, key) {
     return store.REF_KEY;
   }
   return doReference(store, key);
-}
-
-/**
- * Batch version of 'reference()'
- * Accepts array of 'keys'
- * @param {DataStore} store
- * @param {Array<String>} keys
- * @returns {Array<String>}
- */
-function referenceAll(store, keys) {
-  return keys.map(key => doReference(store, key));
 }
 
 /**

@@ -4,7 +4,6 @@ const isPlainObject = require('is-plain-obj');
 const property = require('@yr/property');
 
 module.exports = get;
-module.exports.all = getAll;
 
 /**
  * Retrieve value stored at 'key'
@@ -18,17 +17,6 @@ function get(store, key) {
     return store._data;
   }
   return doGet(store, key);
-}
-
-/**
- * Batch version of 'get()'
- * Accepts array of 'keys'
- * @param {DataStore} store
- * @param {Array} keys
- * @returns {Array}
- */
-function getAll(store, keys) {
-  return keys.map(key => doGet(store, key));
 }
 
 /**

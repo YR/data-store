@@ -1,7 +1,6 @@
 'use strict';
 
 const assign = require('object-assign');
-const isPlainObject = require('is-plain-obj');
 const property = require('@yr/property');
 const runtime = require('@yr/runtime');
 
@@ -12,7 +11,6 @@ const DEFAULT_OPTIONS = {
 };
 
 module.exports = set;
-module.exports.all = setAll;
 
 /**
  * Store 'value' at 'key'
@@ -22,34 +20,10 @@ module.exports.all = setAll;
  * @param {Object} [options]
  *  - {Boolean} immutable
  *  - {Boolean} merge
- * @returns {void}
+ * @returns {Boolean}
  */
 function set(store, key, value, options) {
-  store.changed = doSet(store, key, value, assign({}, DEFAULT_OPTIONS, options));
-}
-
-/**
- * Batch version of 'set()'
- * Accepts hash of key/value pairs
- * @param {DataStore} store
- * @param {Object} keys
- * @param {Object} [options]
- *  - {Boolean} immutable
- *  - {Boolean} merge
- */
-function setAll(store, keys, options) {
-  let changed = false;
-
-  if (isPlainObject(keys)) {
-    options = assign({}, DEFAULT_OPTIONS, options);
-    for (const key in keys) {
-      if (doSet(store, key, keys[key], options)) {
-        changed = true;
-      }
-    }
-  }
-
-  store.changed = changed;
+  return doSet(store, key, value, assign({}, DEFAULT_OPTIONS, options));
 }
 
 /**
