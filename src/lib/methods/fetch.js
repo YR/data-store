@@ -201,7 +201,7 @@ function getHeaders(expires, minExpiry) {
   }
 
   return {
-    'cache-control': `public, max-age=${(expires - now) / 1000}`,
+    'cache-control': `public, max-age=${Math.ceil((expires - now) / 1000)}`,
     expires: new Date(expires).toUTCString()
   };
 }
