@@ -212,8 +212,8 @@ function getHeaders(expires, minExpiry) {
  * @returns {Boolean}
  */
 function hasExpired(obj, expiresKey) {
-  // Round down to nearest second
-  const now = Math.floor(Date.now() / 1000) * 1000;
+  // Round up to nearest second
+  const now = Math.ceil(Date.now() / 1000) * 1000;
 
   return !!(obj && isPlainObject(obj) && expiresKey in obj && now > obj[expiresKey]);
 }

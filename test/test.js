@@ -525,7 +525,7 @@ describe('FetchableDataStore', () => {
 
       return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true }).then(response => {
         expect(response.body).to.not.have.property('foo');
-        expect(response.headers['cache-control']).to.equal('public, max-age=4');
+        expect(response.headers['cache-control']).to.equal('public, max-age=5');
       });
     });
     it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', () => {
