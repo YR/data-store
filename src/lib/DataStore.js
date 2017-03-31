@@ -151,16 +151,22 @@ module.exports = class DataStore {
    * Trigger registered action with optional 'args
    * @param {String} name
    * @param {Array} [args]
+   * @returns {Promise}
    */
   trigger(name, ...args) {
     const action = this._actions[name];
 
-    if (action) {
-      this.debug(`triggering ${name} action`);
-      action(this, ...args);
-    } else {
-      this.debug(`action ${name} not registered`);
+    if (!action) {
+      const reason = `action ${name} not registered`;
+
+      this.debug(reason);
+      return Promise.reject(new Error(reason));
     }
+
+    this.debug(`triggering ${name} action`);
+    const promise = action(this, ...args);
+
+    return promise || Promise.resolve();
   }
 
   /**

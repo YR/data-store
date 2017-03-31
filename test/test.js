@@ -440,23 +440,30 @@ describe('DataStore', () => {
   });
 
   describe('actions', () => {
-    it('should trigger nothing if no action registered', () => {
-      store.trigger('bar');
-      expect(store.get('bar')).to.equal('bat');
+    it('should reject if no action registered', () => {
+      return store.trigger('bar')
+        .catch((err) => {
+          expect(store.get('bar')).to.equal('bat');
+          expect(err.message).to.equal('action bar not registered');
+        });
     });
     it('should register an action', () => {
       store.registerAction('foo', store => {
         store.set('foo', 'foo');
       });
-      store.trigger('foo');
-      expect(store.get('foo')).to.equal('foo');
+      return store.trigger('foo')
+        .then(() => {
+          expect(store.get('foo')).to.equal('foo');
+        });
     });
     it('should register an action with passed arguments', () => {
       store.registerAction('foo', (store, bar) => {
         store.set('foo', bar);
       });
-      store.trigger('foo', 'bar');
-      expect(store.get('foo')).to.equal('bar');
+      return store.trigger('foo', 'bar')
+        .then(() => {
+          expect(store.get('foo')).to.equal('bar');
+        });
     });
     it('should unregister an action', () => {
       store.registerAction('foo', store => {

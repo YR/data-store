@@ -82,7 +82,7 @@ store.registerAction([
 ]);
 ```
 
-#### `trigger (name: String, ...args)`
+#### `trigger (name: String, ...args): Promise`
 Trigger action registered with `name` (see [actions](#actions)):
 
 ```js
@@ -241,7 +241,7 @@ const cursor = store.createCursor('foo/bar');
 // All get()/getAll() calls are now scoped to 'foo/bar'
 ```
 
-#### `trigger (name: String, ...args)`
+#### `trigger (name: String, ...args): Promise`
 Trigger action registered on parent `DataStore` with `name` (see [actions](#actions)):
 
 ```js
@@ -324,3 +324,5 @@ store.registerAction(DO_FOO, function (store, bar) {
 });
 store.trigger(DO_FOO, 'bat');
 ```
+
+Actions can optionally return a resolved or rejected `Promise`.
