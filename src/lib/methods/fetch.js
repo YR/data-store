@@ -63,9 +63,12 @@ function doFetch(store, key, url, options) {
   const value = get(store, key);
   const isMissingOrExpired = !value || hasExpired(value, store.EXPIRES_KEY);
 
+  store.debug('fetch %s from %s', key, url);
+
   // Load if missing or expired
   if (isMissingOrExpired) {
     if (!url) {
+      store.debug('fetched %s with missing url', key);
       return Promise.resolve({
         body: value,
         duration: 0,
@@ -74,11 +77,10 @@ function doFetch(store, key, url, options) {
       });
     }
 
-    store.debug('fetch %s from %s', key, url);
-
     const promiseToLoad = new Promise((resolve, reject) => {
       load(store, key, url, options)
         .then(res => {
+          store.debug('fetched %s from %s', key, url);
           resolve({
             body: get(store, key),
             duration: res.duration,
@@ -90,6 +92,7 @@ function doFetch(store, key, url, options) {
           if (!staleIfError) {
             return reject(err);
           }
+          store.debug('fetched stale %s after load error', key);
           return resolve({
             body: value,
             duration: 0,
@@ -109,6 +112,7 @@ function doFetch(store, key, url, options) {
     });
   }
 
+  store.debug('fetched %s %s', isMissingOrExpired ? 'stale' : 'existing', key);
   // Return data (possibly stale)
   return Promise.resolve({
     body: value,
