@@ -6,7 +6,6 @@ const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
 const runtime = require('@yr/runtime');
 
-const GRACE = 1000;
 const EXPIRES_KEY = '__expires';
 
 module.exports = class FetchableDataStore extends DataStore {
@@ -27,7 +26,6 @@ module.exports = class FetchableDataStore extends DataStore {
 
     super(id, data, options);
 
-    this.GRACE = GRACE;
     this.EXPIRES_KEY = EXPIRES_KEY;
   }
 

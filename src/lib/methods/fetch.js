@@ -12,6 +12,7 @@ const DEFAULT_LOAD_OPTIONS = {
   // 5 sec
   timeout: 5 * 1000
 };
+const MIN_REVALIDATION_EXPIRY = 4000;
 
 module.exports = fetch;
 
@@ -112,7 +113,7 @@ function doFetch(store, key, url, options) {
     body: value,
     duration: 0,
     // Short expiry while revalidating
-    headers: getHeaders(value && value[store.EXPIRES_KEY], staleWhileRevalidate ? store.GRACE * 4 : minExpiry),
+    headers: getHeaders(value && value[store.EXPIRES_KEY], staleWhileRevalidate ? MIN_REVALIDATION_EXPIRY : minExpiry),
     key,
     status: 200
   });
@@ -152,7 +153,7 @@ function load(store, key, url, options) {
 
         // Add expires header
         if (res.headers && 'expires' in res.headers) {
-          data[store.EXPIRES_KEY] = getExpires(res.headers.expires, minExpiry, store.GRACE);
+          data[store.EXPIRES_KEY] = getExpires(res.headers.expires, minExpiry);
         }
 
         // Enable handling by not calling inner set()
@@ -176,12 +177,10 @@ function load(store, key, url, options) {
  * Retrieve expires from 'dateString'
  * @param {Number} dateString
  * @param {Number} minExpiry
- * @param {Number} grace
  * @returns {Number}
  */
-function getExpires(dateString, minExpiry, grace) {
-  // Add latency overhead to compensate for transmission time
-  const expires = Number(new Date(dateString)) + grace;
+function getExpires(dateString, minExpiry) {
+  const expires = Number(new Date(dateString));
   const now = Date.now();
 
   return expires > now ? expires : now + minExpiry;
