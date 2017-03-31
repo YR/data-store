@@ -12,7 +12,7 @@ const DEFAULT_LOAD_OPTIONS = {
   // 5 sec
   timeout: 5 * 1000
 };
-const MIN_REVALIDATION_EXPIRY = 4000;
+const MIN_REVALIDATION_EXPIRY = 5000;
 
 module.exports = fetch;
 
