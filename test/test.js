@@ -5,7 +5,6 @@ const agent = require('@yr/agent');
 const expect = require('expect.js');
 const HandlerContext = require('../src/lib/HandlerContext');
 const nock = require('nock');
-
 let fake, store;
 
 describe('DataStore', () => {
@@ -441,29 +440,26 @@ describe('DataStore', () => {
 
   describe('actions', () => {
     it('should reject if no action registered', () => {
-      return store.trigger('bar')
-        .catch((err) => {
-          expect(store.get('bar')).to.equal('bat');
-          expect(err.message).to.equal('action bar not registered');
-        });
+      return store.trigger('bar').catch(err => {
+        expect(store.get('bar')).to.equal('bat');
+        expect(err.message).to.equal('action bar not registered');
+      });
     });
     it('should register an action', () => {
       store.registerAction('foo', store => {
         store.set('foo', 'foo');
       });
-      return store.trigger('foo')
-        .then(() => {
-          expect(store.get('foo')).to.equal('foo');
-        });
+      return store.trigger('foo').then(() => {
+        expect(store.get('foo')).to.equal('foo');
+      });
     });
     it('should register an action with passed arguments', () => {
       store.registerAction('foo', (store, bar) => {
         store.set('foo', bar);
       });
-      return store.trigger('foo', 'bar')
-        .then(() => {
-          expect(store.get('foo')).to.equal('bar');
-        });
+      return store.trigger('foo', 'bar').then(() => {
+        expect(store.get('foo')).to.equal('bar');
+      });
     });
     it('should unregister an action', () => {
       store.registerAction('foo', store => {
@@ -514,38 +510,44 @@ describe('FetchableDataStore', () => {
       nock.cleanAll();
     });
 
-    it('should return a Promise without the value if missing "key"', () => {
-      return store.fetch(null, 'bar', {}).then(result => {
-        expect(result.body).to.equal(undefined);
+    it('should reject if missing "key"', () => {
+      return store.fetch(null, 'bar', {}).catch(err => {
+        expect(err.message).to.equal('missing fetch key');
       });
     });
     it('should return a Promise with the value', () => {
-      return store.fetch('bar', 'bar', {}).then(result => {
-        expect(result.body).to.equal('bat');
+      return store.fetch('bar', 'bar', {}).then(response => {
+        expect(response.body).to.equal('bat');
       });
     });
-    it('should return a Promise with expired value when "options.staleWhileRevalidate = true"', () => {
+    it('should return a Promise with stale value when "options.staleWhileRevalidate = true"', () => {
       store.set('foo/__expires', 0);
 
-      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true }).then(result => {
-        expect(result.body).to.not.have.property('foo');
+      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true }).then(response => {
+        expect(response.body).to.not.have.property('foo');
+        expect(response.headers['cache-control']).to.equal('public, max-age=4');
       });
     });
     it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', () => {
-      fake.get('/foo').reply(200, { foo: 'foo' });
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' }, { 'cache-control': 'public, max-age=10', expires: new Date(Date.now() + 10000).toUTCString() });
       store.set('foo/__expires', 0);
 
-      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false }).then(result => {
-        expect(result.body).to.have.property('foo', 'foo');
+      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false }).then(response => {
+        expect(response.body).to.have.property('foo', 'foo');
+        expect(response.headers['cache-control']).to.equal('public, max-age=10');
       });
     });
-    it('should return a Promise with expired value when "options.staleIfError = true" and value', () => {
+    it('should return a Promise with stale value when "options.staleIfError = true" and value', () => {
       fake.get('/foo').replyWithError(500);
       store.set('foo/__expires', 0);
 
-      return store.fetch('foo', 'http://localhost/foo', { staleIfError: true }).then(result => {
+      return store.fetch('foo', 'http://localhost/foo', { staleIfError: true }).then(response => {
         expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' }, __expires: 0 });
-        expect(result.body).to.have.property('bar', 'boo');
+        expect(response.body).to.have.property('bar', 'boo');
+        expect(response.headers['cache-control']).to.equal('public, max-age=120');
+        expect(response.status).to.equal(500);
       });
     });
     it('should return a rejected Promise when failure loading', () => {
@@ -553,7 +555,7 @@ describe('FetchableDataStore', () => {
 
       return store
         .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 100 })
-        .then(results => {
+        .then(response => {
           throw Error('expected an error');
         })
         .catch(err => {
@@ -567,12 +569,12 @@ describe('FetchableDataStore', () => {
 
       return store
         .fetch('foo', 'http://localhost/foo', { staleIfError: false })
-        .then(result => {
+        .then(response => {
           throw Error('expected an error');
         })
         .catch(err => {
           expect(store.get('foo')).to.equal(undefined);
-          expect(err).to.have.property('status', 500);
+          expect(err.status).to.equal(500);
         });
     });
     it('should return a rejected Promise when "options.staleIfError = false" and no existing value', () => {
@@ -580,12 +582,12 @@ describe('FetchableDataStore', () => {
 
       return store
         .fetch('zoop', 'http://localhost/zoop', { staleIfError: false })
-        .then(result => {
+        .then(response => {
           throw Error('expected an error');
         })
         .catch(err => {
           expect(store.get('zoop')).to.equal(undefined);
-          expect(err).to.have.property('status', 500);
+          expect(err.status).to.equal(500);
         });
     });
     it('should do nothing when loading aborted', done => {
@@ -607,9 +609,9 @@ describe('FetchableDataStore', () => {
           ['foo', 'http://localhost/foo', { staleWhileRevalidate: false }],
           ['bar', 'http://localhost/bar', { staleWhileRevalidate: false }]
         ])
-        .then(results => {
-          expect(results[0].body).to.have.property('foo', 'foo');
-          expect(results[1].body).to.have.property('bar', 'bar');
+        .then(responses => {
+          expect(responses[0].body).to.have.property('foo', 'foo');
+          expect(responses[1].body).to.have.property('bar', 'bar');
         });
     });
   });

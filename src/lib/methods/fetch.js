@@ -6,9 +6,11 @@ const get = require('./get');
 const isPlainObject = require('is-plain-obj');
 
 const DEFAULT_LOAD_OPTIONS = {
-  minExpiry: 60000,
+  // 2 min
+  minExpiry: 2 * 60 * 1000,
   retry: 2,
-  timeout: 5000
+  // 5 sec
+  timeout: 5 * 1000
 };
 
 module.exports = fetch;
@@ -56,12 +58,13 @@ function fetch(store, key, url, options) {
 function doFetch(store, key, url, options) {
   const { minExpiry, staleWhileRevalidate, staleIfError } = options;
   const value = get(store, key);
-  const isMissingOrExpired = !value || hasExpired(value, store.EXPIRES_KEY);
+  const isExpired = hasExpired(value, store.EXPIRES_KEY);
+  const isMissing = !value;
 
   store.debug('fetch %s from %s', key, url);
 
   // Load if missing or expired
-  if (isMissingOrExpired) {
+  if (isMissing || isExpired) {
     if (!url) {
       return Promise.reject(new Error('missing fetch url'));
     }
@@ -74,7 +77,8 @@ function doFetch(store, key, url, options) {
             body: get(store, key),
             duration: res.duration,
             headers: res.headers,
-            key
+            key,
+            status: res.status
           });
         })
         .catch(err => {
@@ -86,8 +90,9 @@ function doFetch(store, key, url, options) {
             body: value,
             duration: 0,
             error: err,
-            headers: { expires: new Date(Date.now() + minExpiry).toUTCString(), status: err.status },
-            key
+            headers: getHeaders(0, minExpiry),
+            key,
+            status: err.status
           });
         });
     });
@@ -101,13 +106,15 @@ function doFetch(store, key, url, options) {
     });
   }
 
-  store.debug('fetched %s %s', isMissingOrExpired ? 'stale' : 'existing', key);
+  store.debug('fetched %s %s', isMissing ? 'new' : isExpired ? 'stale' : 'existing', key);
   // Return data (possibly stale)
   return Promise.resolve({
     body: value,
     duration: 0,
-    headers: { status: 200 },
-    key
+    // Short expiry while revalidating
+    headers: getHeaders(value && value[store.EXPIRES_KEY], staleWhileRevalidate ? store.GRACE * 4 : minExpiry),
+    key,
+    status: 200
   });
 }
 
@@ -145,7 +152,7 @@ function load(store, key, url, options) {
 
         // Add expires header
         if (res.headers && 'expires' in res.headers) {
-          data[store.EXPIRES_KEY] = getExpiry(res.headers.expires, minExpiry, store.GRACE);
+          data[store.EXPIRES_KEY] = getExpires(res.headers.expires, minExpiry, store.GRACE);
         }
 
         // Enable handling by not calling inner set()
@@ -166,21 +173,37 @@ function load(store, key, url, options) {
 }
 
 /**
- * Retrieve expiry from 'dateString'
+ * Retrieve expires from 'dateString'
  * @param {Number} dateString
- * @param {Number} minimum
+ * @param {Number} minExpiry
  * @param {Number} grace
  * @returns {Number}
  */
-function getExpiry(dateString, minimum, grace) {
+function getExpires(dateString, minExpiry, grace) {
   // Add latency overhead to compensate for transmission time
   const expires = Number(new Date(dateString)) + grace;
   const now = Date.now();
 
-  return expires > now
-    ? expires
-    : // Local clock is set incorrectly
-      now + minimum;
+  return expires > now ? expires : now + minExpiry;
+}
+
+/**
+ * Retrieve headers object
+ * @param {Number} [expires]
+ * @param {Number} minExpiry
+ * @returns {Object}
+ */
+function getHeaders(expires, minExpiry) {
+  const now = Date.now();
+
+  if (!expires || expires < now) {
+    expires = now + minExpiry;
+  }
+
+  return {
+    'cache-control': `public, max-age=${(expires - now) / 1000}`,
+    expires: new Date(expires).toUTCString()
+  };
 }
 
 /**
@@ -190,5 +213,5 @@ function getExpiry(dateString, minimum, grace) {
  * @returns {Boolean}
  */
 function hasExpired(obj, expiresKey) {
-  return obj && isPlainObject(obj) && expiresKey in obj && Date.now() > obj[expiresKey];
+  return !!(obj && isPlainObject(obj) && expiresKey in obj && Date.now() > obj[expiresKey]);
 }
