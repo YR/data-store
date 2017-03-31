@@ -30,12 +30,7 @@ module.exports = fetch;
  */
 function fetch(store, key, url, options) {
   if (!key) {
-    return Promise.resolve({
-      body: undefined,
-      duration: 0,
-      headers: { status: 500 },
-      key
-    });
+    return Promise.reject(new Error('missing fetch key'));
   }
 
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
@@ -68,13 +63,7 @@ function doFetch(store, key, url, options) {
   // Load if missing or expired
   if (isMissingOrExpired) {
     if (!url) {
-      store.debug('fetched %s with missing url', key);
-      return Promise.resolve({
-        body: value,
-        duration: 0,
-        headers: { status: 500 },
-        key
-      });
+      return Promise.reject(new Error('missing fetch url'));
     }
 
     const promiseToLoad = new Promise((resolve, reject) => {
