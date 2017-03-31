@@ -139,6 +139,12 @@ store.set('stuff', store.referenceAll(['foo/bar/bat', 'bar']));
 store.get('stuff/0'); //=> true
 ```
 
+#### `unreference (key: String): String`
+Inverse of `reference()`.
+
+#### `unreferenceAll (keys: Array): Array`
+Batch version of `unreference()`. Accepts array of referenced `keys`, and returns array of keys.
+
 #### `reset (data: Object)`
 Reset/replace underlying data with `data`.
 

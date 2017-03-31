@@ -149,6 +149,21 @@ describe('DataStore', () => {
     });
   });
 
+  describe('unreference()', () => {
+    it('should return a regular key', () => {
+      expect(store.unreference('bar')).to.equal('bar');
+    });
+    it('should return an unreferenced key', () => {
+      expect(store.unreference('__ref:bar')).to.equal('bar');
+    });
+  });
+
+  describe('unreferenceAll()', () => {
+    it('should return an array of unreferenced keys', () => {
+      expect(store.unreferenceAll(['__ref:bar', '__ref:foo/bar'])).to.eql(['bar', 'foo/bar']);
+    });
+  });
+
   describe('cursors', () => {
     describe('createCursor()', () => {
       it('should generate a cursor instance', () => {

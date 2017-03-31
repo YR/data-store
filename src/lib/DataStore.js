@@ -6,7 +6,6 @@ const debugFactory = require('debug');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
-const reference = require('./methods/reference');
 const set = require('./methods/set');
 
 const HANDLED_METHODS = {
@@ -225,7 +224,7 @@ module.exports = class DataStore {
       }
     }
 
-   this.changed = changed;
+    this.changed = changed;
   }
 
   /**
@@ -234,7 +233,12 @@ module.exports = class DataStore {
    * @returns {String}
    */
   reference(key) {
-    return reference(this, key);
+    if (!key) {
+      return this.REF_KEY;
+    }
+    // Resolve back to original key if referenced
+    key = this._resolveRefKey(key);
+    return `${this.REF_KEY}${key}`;
   }
 
   /**
@@ -244,7 +248,29 @@ module.exports = class DataStore {
    * @returns {Array<String>}
    */
   referenceAll(keys) {
-    return keys.map(key => reference(this, key));
+    return keys.map(key => this.reference(key));
+  }
+
+  /**
+   * Retrieve unreferenced 'key'
+   * @param {String} [key]
+   * @returns {String}
+   */
+  unreference(key) {
+    if (!key) {
+      return '';
+    }
+    return this._isRefValue(key) ? this._parseRefKey(key) : key;
+  }
+
+  /**
+   * Batch version of 'unreference()'
+   * Accepts array of 'keys'
+   * @param {Array<String>} keys
+   * @returns {Array<String>}
+   */
+  unreferenceAll(keys) {
+    return keys.map(key => this.unreference(key));
   }
 
   /**
