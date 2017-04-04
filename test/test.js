@@ -597,6 +597,20 @@ describe('FetchableDataStore', () => {
       agent.abortAll();
       setTimeout(done, 100);
     });
+    it('should allow handling', () => {
+      let run = 0;
+
+      store.useHandler(context => {
+        run++;
+        expect(context.method).to.equal('fetch');
+        expect(context.store).to.have.property('EXPIRES_KEY', '__expires');
+      });
+
+      return store.fetch('bar', 'bar', {}).then(response => {
+        expect(response.body).to.equal('bat');
+        expect(run).to.equal(1);
+      });
+    });
   });
 
   describe('fetchAll()', () => {

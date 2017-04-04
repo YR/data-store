@@ -38,18 +38,13 @@ module.exports = class DataStore {
     this._actions = {};
     this._cursors = {};
     this._data = {};
-    this._handledMethods = {};
+    // Allow sub classes to send in methods for registration
+    this._handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
     this._handlers = [];
     this._serialisableKeys = options.serialisableKeys || {};
 
     this.debug('created');
 
-    // Allow sub classes to send in methods for registration
-    const handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
-
-    for (const methodName in handledMethods) {
-      this._registerHandledMethod(methodName, ...handledMethods[methodName]);
-    }
     if (options.handlers) {
       this.useHandler(options.handlers);
     }
@@ -202,7 +197,7 @@ module.exports = class DataStore {
       return;
     }
 
-    this.changed = this._handledMethods.set(key, value, options);
+    this.changed = this._routeHandledMethod('set', key, value, options);
   }
 
   /**
@@ -223,7 +218,7 @@ module.exports = class DataStore {
 
     if (isPlainObject(keys)) {
       for (const key in keys) {
-        if (this._handledMethods.set(key, keys[key], options)) {
+        if (this._routeHandledMethod('set', key, keys[key], options)) {
           changed = true;
         }
       }
@@ -283,7 +278,7 @@ module.exports = class DataStore {
    * @param {Object} data
    */
   reset(data) {
-    this._handledMethods.reset(data);
+    this._routeHandledMethod('reset', data);
   }
 
   /**
@@ -470,33 +465,13 @@ module.exports = class DataStore {
   }
 
   /**
-   * Register handled method with 'methodName'
-   * @param {String} methodName
-   * @param {Function} fn
-   * @param {Array} signature
-   */
-  _registerHandledMethod(methodName, fn, signature) {
-    if (this._handledMethods[methodName]) {
-      return;
-    }
-
-    // Partially apply arguments for routing
-    this._handledMethods[methodName] = this._routeHandledMethod.bind(this, methodName, fn, signature);
-    // Expose method if it doesn't exist
-    if (!this[methodName]) {
-      this[methodName] = this._handledMethods[methodName];
-    }
-  }
-
-  /**
    * Route 'fn' through handlers
    * @param {String} methodName
-   * @param {Function} fn
-   * @param {Array} signature
    * @param {*} args
    * @returns {Object|null}
    */
-  _routeHandledMethod(methodName, fn, signature, ...args) {
+  _routeHandledMethod(methodName, ...args) {
+    const [fn, signature] = this._handledMethods[methodName];
     const isKeyed = signature[0] === 'key';
     let [key = '', ...rest] = args;
 

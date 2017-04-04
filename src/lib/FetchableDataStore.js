@@ -43,7 +43,7 @@ module.exports = class FetchableDataStore extends DataStore {
    * @returns {Promise}
    */
   fetch(key, url, options) {
-    return this._handledMethods.fetch(key, url, options);
+    return this._routeHandledMethod('fetch', key, url, options);
   }
 
   /**
@@ -66,7 +66,7 @@ module.exports = class FetchableDataStore extends DataStore {
         keys.map(args => {
           const [key, url, opts = {}] = args;
 
-          return this._handledMethods.fetch(key, url, assign({}, options, opts));
+          return this._routeHandledMethod('fetch', key, url, assign({}, options, opts));
         })
       );
     }
