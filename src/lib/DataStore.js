@@ -8,6 +8,7 @@ const HandlerContext = require('./HandlerContext');
 const isPlainObject = require('is-plain-obj');
 const set = require('./methods/set');
 
+const EXPIRES_KEY = '__expires';
 const HANDLED_METHODS = {
   reset: [reset, ['data']],
   set: [set, ['key', 'value', 'options']]
@@ -27,6 +28,7 @@ module.exports = class DataStore {
    *  - {Object} serialisableKeys
    */
   constructor(id, data, options = {}) {
+    this.EXPIRES_KEY = EXPIRES_KEY;
     this.REF_KEY = REF_KEY;
 
     this.changed = false;

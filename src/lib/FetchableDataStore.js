@@ -6,8 +6,6 @@ const DataStore = require('./DataStore');
 const fetch = require('./methods/fetch');
 const runtime = require('@yr/runtime');
 
-const EXPIRES_KEY = '__expires';
-
 module.exports = class FetchableDataStore extends DataStore {
   /**
    * Constructor
@@ -24,8 +22,6 @@ module.exports = class FetchableDataStore extends DataStore {
     };
 
     super(id, data, options);
-
-    this.EXPIRES_KEY = EXPIRES_KEY;
   }
 
   /**
