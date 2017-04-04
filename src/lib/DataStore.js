@@ -10,8 +10,7 @@ const set = require('./methods/set');
 
 const HANDLED_METHODS = {
   reset: [reset, ['data']],
-  set: [set, ['key', 'value', 'options']],
-  setAll: [set.all, ['keys', 'options']]
+  set: [set, ['key', 'value', 'options']]
 };
 const REF_KEY = '__ref:';
 

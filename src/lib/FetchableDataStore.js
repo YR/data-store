@@ -20,8 +20,7 @@ module.exports = class FetchableDataStore extends DataStore {
    */
   constructor(id, data, options = {}) {
     options.handledMethods = {
-      fetch: [fetch, ['key', 'url', 'options']],
-      fetchAll: [fetch.all, ['keys', 'options']]
+      fetch: [fetch, ['key', 'url', 'options']]
     };
 
     super(id, data, options);
