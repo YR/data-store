@@ -510,9 +510,24 @@ describe('FetchableDataStore', () => {
       nock.cleanAll();
     });
 
-    it('should reject if missing "key"', () => {
-      return store.fetch(null, 'bar', {}).catch(err => {
-        expect(err.message).to.equal('missing fetch key');
+    it('should return an empty response if missing "key"', () => {
+      return store.fetch(null, 'bar', {}).then(response => {
+        expect(response.body).to.equal(undefined);
+        expect(response.status).to.equal(400);
+      });
+    });
+    it('should return an empty response if missing "url"', () => {
+      store.set('foo/__expires', 0);
+
+      return store.fetch('foo', null, {}).then(response => {
+        expect(response.body).to.eql({
+          __expires: 0,
+          bar: 'boo',
+          boo: {
+            bar: 'foo'
+          }
+        });
+        expect(response.status).to.equal(400);
       });
     });
     it('should return a Promise with the value', () => {
@@ -531,7 +546,11 @@ describe('FetchableDataStore', () => {
     it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', () => {
       fake
         .get('/foo')
-        .reply(200, { foo: 'foo' }, { 'cache-control': 'public, max-age=10', expires: new Date(Date.now() + 10000).toUTCString() });
+        .reply(
+          200,
+          { foo: 'foo' },
+          { 'cache-control': 'public, max-age=10', expires: new Date(Date.now() + 10000).toUTCString() }
+        );
       store.set('foo/__expires', 0);
 
       return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false }).then(response => {

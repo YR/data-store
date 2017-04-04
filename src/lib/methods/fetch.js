@@ -32,11 +32,19 @@ module.exports = fetch;
  * @returns {Promise<Response>}
  */
 function fetch(store, key, url, options) {
-  if (!key) {
-    return Promise.reject(new Error('missing fetch key'));
-  }
-
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
+
+  if (!key) {
+    const { minExpiry } = options;
+
+    return Promise.resolve({
+      body: undefined,
+      duration: 0,
+      headers: getHeaders(0, minExpiry),
+      key,
+      status: 400
+    });
+  }
 
   return doFetch(store, key, url, options);
 }
@@ -67,7 +75,13 @@ function doFetch(store, key, url, options) {
   // Load if missing or expired
   if (isMissing || isExpired) {
     if (!url) {
-      return Promise.reject(new Error('missing fetch url'));
+      return Promise.resolve({
+        body: value,
+        duration: 0,
+        headers: getHeaders(value && value[store.EXPIRES_KEY], minExpiry),
+        key,
+        status: 400
+      });
     }
 
     const promiseToLoad = new Promise((resolve, reject) => {
