@@ -229,5 +229,5 @@ function hasExpired(obj, expiresKey) {
   // Round up to nearest second
   const now = Math.ceil(Date.now() / 1000) * 1000;
 
-  return !!(obj && isPlainObject(obj) && expiresKey in obj && now > obj[expiresKey]);
+  return !(obj && isPlainObject(obj) && expiresKey in obj && now < obj[expiresKey]);
 }

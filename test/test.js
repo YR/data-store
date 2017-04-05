@@ -517,11 +517,8 @@ describe('FetchableDataStore', () => {
       });
     });
     it('should return an empty response if missing "url"', () => {
-      store.set('foo/__expires', 0);
-
       return store.fetch('foo', null, {}).then(response => {
         expect(response.body).to.eql({
-          __expires: 0,
           bar: 'boo',
           boo: {
             bar: 'foo'
@@ -531,13 +528,12 @@ describe('FetchableDataStore', () => {
       });
     });
     it('should return a Promise with the value', () => {
-      return store.fetch('bar', 'bar', {}).then(response => {
-        expect(response.body).to.equal('bat');
+      store.set('foo/boo/__expires', Infinity);
+      return store.fetch('foo/boo', 'foo', {}).then(response => {
+        expect(response.body).to.have.property('bar', 'foo');
       });
     });
     it('should return a Promise with stale value when "options.staleWhileRevalidate = true"', () => {
-      store.set('foo/__expires', 0);
-
       return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true }).then(response => {
         expect(response.body).to.not.have.property('foo');
         expect(response.headers['cache-control']).to.equal('public, max-age=5');
@@ -551,8 +547,6 @@ describe('FetchableDataStore', () => {
           { foo: 'foo' },
           { 'cache-control': 'public, max-age=10', expires: new Date(Date.now() + 10000).toUTCString() }
         );
-      store.set('foo/__expires', 0);
-
       return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false }).then(response => {
         expect(response.body).to.have.property('foo', 'foo');
         expect(response.headers['cache-control']).to.equal('public, max-age=10');
@@ -560,10 +554,8 @@ describe('FetchableDataStore', () => {
     });
     it('should return a Promise with stale value when "options.staleIfError = true" and value', () => {
       fake.get('/foo').replyWithError(500);
-      store.set('foo/__expires', 0);
-
       return store.fetch('foo', 'http://localhost/foo', { staleIfError: true }).then(response => {
-        expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' }, __expires: 0 });
+        expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
         expect(response.body).to.have.property('bar', 'boo');
         expect(response.headers['cache-control']).to.equal('public, max-age=120');
         expect(response.status).to.equal(500);
@@ -571,7 +563,6 @@ describe('FetchableDataStore', () => {
     });
     it('should return a rejected Promise when failure loading', () => {
       fake.get('/beep').replyWithError('oops');
-
       return store
         .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 100 })
         .then(response => {
@@ -584,8 +575,6 @@ describe('FetchableDataStore', () => {
     });
     it('should return a rejected Promise when "options.staleIfError = false" and existing value', () => {
       fake.get('/foo').replyWithError(500);
-      store.set('foo/__expires', 0);
-
       return store
         .fetch('foo', 'http://localhost/foo', { staleIfError: false })
         .then(response => {
@@ -598,7 +587,6 @@ describe('FetchableDataStore', () => {
     });
     it('should return a rejected Promise when "options.staleIfError = false" and no existing value', () => {
       fake.get('/zoop').replyWithError(500);
-
       return store
         .fetch('zoop', 'http://localhost/zoop', { staleIfError: false })
         .then(response => {
@@ -617,16 +605,24 @@ describe('FetchableDataStore', () => {
       setTimeout(done, 100);
     });
     it('should allow handling', () => {
+      fake
+        .get('/foo')
+        .reply(
+          200,
+          { foo: 'foo' },
+          { 'cache-control': 'public, max-age=10', expires: new Date(Date.now() + 10000).toUTCString() }
+        );
+
       let run = 0;
 
       store.useHandler(context => {
-        run++;
-        expect(context.method).to.equal('fetch');
-        expect(context.store).to.have.property('EXPIRES_KEY', '__expires');
+        if (context.method === 'fetch') {
+          run++;
+          expect(context.store).to.have.property('EXPIRES_KEY', '__expires');
+        }
       });
 
-      return store.fetch('bar', 'bar', {}).then(response => {
-        expect(response.body).to.equal('bat');
+      return store.fetch('foo', 'http://localhost/foo', {}).then(response => {
         expect(run).to.equal(1);
       });
     });
