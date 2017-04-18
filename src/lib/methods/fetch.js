@@ -6,13 +6,10 @@ const get = require('./get');
 const isPlainObject = require('is-plain-obj');
 
 const DEFAULT_LOAD_OPTIONS = {
-  // 2 min
-  minExpiry: 2 * 60 * 1000,
+  cacheControl: 'public, max-age=120, stale-while-revalidate=30, stale-if-error=60',
   retry: 2,
-  // 5 sec
-  timeout: 5 * 1000
+  timeout: 5
 };
-const MIN_REVALIDATION_EXPIRY = 5000;
 
 module.exports = fetch;
 
@@ -65,7 +62,7 @@ function fetch(store, key, url, options) {
  * @returns {Promise}
  */
 function doFetch(store, key, url, options) {
-  const { minExpiry, staleWhileRevalidate, staleIfError } = options;
+  const { grace, minExpiry, staleWhileRevalidate, staleIfError } = options;
   const value = get(store, key);
   const isExpired = hasExpired(value, store.EXPIRES_KEY);
   const isMissing = !value;
@@ -78,7 +75,7 @@ function doFetch(store, key, url, options) {
       return Promise.resolve({
         body: value,
         duration: 0,
-        headers: getHeaders(value && value[store.EXPIRES_KEY], minExpiry),
+        headers: getHeaders(value && value[store.EXPIRES_KEY], minExpiry, grace),
         key,
         status: 400
       });
@@ -105,7 +102,7 @@ function doFetch(store, key, url, options) {
             body: value,
             duration: 0,
             error: err,
-            headers: getHeaders(0, minExpiry),
+            headers: getHeaders(0, minExpiry, grace),
             key,
             status: err.status
           });
@@ -127,7 +124,11 @@ function doFetch(store, key, url, options) {
     body: value,
     duration: 0,
     // Short expiry while revalidating
-    headers: getHeaders(value && value[store.EXPIRES_KEY], staleWhileRevalidate ? MIN_REVALIDATION_EXPIRY : minExpiry),
+    headers: getHeaders(
+      value && value[store.EXPIRES_KEY],
+      staleWhileRevalidate ? grace * 2 : minExpiry,
+      grace
+    ),
     key,
     status: 200
   });
@@ -204,16 +205,20 @@ function getExpires(dateString, minExpiry) {
  * Retrieve headers object
  * @param {Number} [expires]
  * @param {Number} minExpiry
+ * @param {Number} grace
  * @returns {Object}
  */
-function getHeaders(expires, minExpiry) {
+function getHeaders(expires, minExpiry, grace = 0) {
   const now = Date.now();
 
   if (!expires || expires < now) {
     expires = now + minExpiry;
   }
 
+  expires += grace;
+
   return {
+    // Round up to nearest second
     'cache-control': `public, max-age=${Math.ceil((expires - now) / 1000)}`,
     expires: new Date(expires).toUTCString()
   };
