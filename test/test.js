@@ -516,7 +516,7 @@ describe('FetchableDataStore', () => {
         expect(response.status).to.equal(400);
       });
     });
-    it('should return an empty response if missing "url"', () => {
+    it.only('should return an empty response if missing "url"', () => {
       return store.fetch('foo', null, {}).then(response => {
         expect(response.body).to.eql({
           bar: 'boo',
