@@ -6,10 +6,12 @@ const get = require('./get');
 const isPlainObject = require('is-plain-obj');
 
 const DEFAULT_LOAD_OPTIONS = {
-  cacheControl: 'public, max-age=120, stale-while-revalidate=30, stale-if-error=60',
+  cacheControl: 'public, max-age=120, stale-while-revalidate=150, stale-if-error=180',
+  rejectOnError: true,
   retry: 2,
-  timeout: 5
+  timeout: 5 * 1000
 };
+const RE_CACHE_CONTROL = /max-age=(\d+)|stale-while-revalidate=(\d+)|stale-if-error=(\d+)/g;
 
 module.exports = fetch;
 
@@ -20,24 +22,22 @@ module.exports = fetch;
  * @param {String} url
  * @param {Object} options
  *  - {Boolean} abort
+ *  - {String} cacheControl
  *  - {Boolean} ignoreQuery
- *  - {Number} minExpiry
  *  - {Number} retry
- *  - {Boolean} staleWhileRevalidate
- *  - {Boolean} staleIfError
+ *  - {Boolean} rejectOnError
  *  - {Number} timeout
  * @returns {Promise<Response>}
  */
 function fetch(store, key, url, options) {
   options = assign({}, DEFAULT_LOAD_OPTIONS, options);
+  options.cacheControl = parseCacheControl(options.cacheControl);
 
   if (!key) {
-    const { minExpiry } = options;
-
     return Promise.resolve({
       body: undefined,
       duration: 0,
-      headers: getHeaders(0, minExpiry),
+      headers: generateHeaders(),
       key,
       status: 400
     });
@@ -53,18 +53,17 @@ function fetch(store, key, url, options) {
  * @param {String} url
  * @param {Object} options
  *  - {Boolean} abort
+ *  - {Object} cacheControl
  *  - {Boolean} ignoreQuery
- *  - {Number} minExpiry
  *  - {Number} retry
- *  - {Boolean} staleWhileRevalidate
- *  - {Boolean} staleIfError
+ *  - {Boolean} rejectOnError
  *  - {Number} timeout
  * @returns {Promise}
  */
 function doFetch(store, key, url, options) {
-  const { grace, minExpiry, staleWhileRevalidate, staleIfError } = options;
+  const { rejectOnError } = options;
   const value = get(store, key);
-  const isExpired = hasExpired(value, store.EXPIRES_KEY);
+  const isExpired = hasExpired(value, store.HEADERS_KEY);
   const isMissing = !value;
 
   store.debug('fetch %s from %s', key, url);
@@ -75,7 +74,7 @@ function doFetch(store, key, url, options) {
       return Promise.resolve({
         body: value,
         duration: 0,
-        headers: getHeaders(value && value[store.EXPIRES_KEY], minExpiry, grace),
+        headers: generateHeaders(),
         key,
         status: 400
       });
@@ -88,13 +87,13 @@ function doFetch(store, key, url, options) {
           resolve({
             body: get(store, key),
             duration: res.duration,
-            headers: res.headers,
+            headers: generateHeaders(res.headers),
             key,
             status: res.status
           });
         })
         .catch(err => {
-          if (!staleIfError) {
+          if (rejectOnError) {
             return reject(err);
           }
           store.debug('fetched stale %s after load error', key);
@@ -102,14 +101,14 @@ function doFetch(store, key, url, options) {
             body: value,
             duration: 0,
             error: err,
-            headers: getHeaders(0, minExpiry, grace),
+            headers: generateHeaders(),
             key,
             status: err.status
           });
         });
     });
 
-    if (!(value && staleWhileRevalidate)) {
+    if (!value) {
       return promiseToLoad;
     }
     // Prevent unhandled
@@ -123,12 +122,7 @@ function doFetch(store, key, url, options) {
   return Promise.resolve({
     body: value,
     duration: 0,
-    // Short expiry while revalidating
-    headers: getHeaders(
-      value && value[store.EXPIRES_KEY],
-      staleWhileRevalidate ? grace * 2 : minExpiry,
-      grace
-    ),
+    headers: generateHeaders(),
     key,
     status: 200
   });
@@ -149,7 +143,7 @@ function doFetch(store, key, url, options) {
  * @returns {Promise}
  */
 function load(store, key, url, options) {
-  const { minExpiry, retry, staleIfError, timeout } = options;
+  const { cacheControl, rejectOnError, retry, timeout } = options;
 
   options.id = key;
 
@@ -166,9 +160,9 @@ function load(store, key, url, options) {
       if (res.body) {
         const data = res.body;
 
-        // Add expires header
+        // Parse cache-control headers
         if (res.headers && 'expires' in res.headers) {
-          data[store.EXPIRES_KEY] = getExpires(res.headers.expires, minExpiry);
+          data[store.HEADERS_KEY] = parseHeaders(res.headers, cacheControl);
         }
 
         // Enable handling by not calling inner set()
@@ -180,7 +174,7 @@ function load(store, key, url, options) {
     .catch(err => {
       store.debug('unable to load "%s" from %s', key, url);
 
-      if (!staleIfError) {
+      if (rejectOnError) {
         store.set(key, undefined, options);
       }
 
@@ -189,16 +183,50 @@ function load(store, key, url, options) {
 }
 
 /**
- * Retrieve expires from 'dateString'
- * @param {Number} dateString
- * @param {Number} minExpiry
+ * Parse 'cacheControlString'
+ * @param {String} cacheControlString
+ * @returns {Object}
+ */
+function parseCacheControl(cacheControlString) {
+  if (cacheControlString && typeof cacheControlString === 'string') {
+    const match = cacheControlString.match(RE_CACHE_CONTROL);
+
+    if (match) {
+      const [, maxAge, staleWhileRevalidate, staleIfError] = match;
+
+      return {
+        maxAge: maxAge ? parseInt(maxAge, 10) : 0,
+        staleWhileRevalidate: staleWhileRevalidate ? parseInt(staleWhileRevalidate, 10) : 0,
+        staleIfError: staleIfError ? parseInt(staleIfError, 10) : 0
+      };
+    }
+  }
+
+  return {
+    maxAge: 0,
+    staleWhileRevalidate: 0,
+    staleIfError: 0
+  };
+}
+
+/**
+ * Parse 'headers'
+ * @param {Object} headers
+ * @param {Object} defaultCacheControl
  * @returns {Number}
  */
-function getExpires(dateString, minExpiry) {
-  const expires = Number(new Date(dateString));
+function parseHeaders(headers, defaultCacheControl) {
   const now = Date.now();
+  let expires = now;
 
-  return expires > now ? expires : now + minExpiry;
+  if (headers.expires) {
+    expires = typeof headers.expires === 'string' ? Number(new Date(headers.expires)) : headers.expires;
+  }
+
+  return {
+    cacheControl: assign({}, defaultCacheControl, parseCacheControl(headers['cache-control'])),
+    expires: now > expires ? now + (defaultCacheControl.maxAge * 1000) : expires
+  };
 }
 
 /**
@@ -208,7 +236,7 @@ function getExpires(dateString, minExpiry) {
  * @param {Number} grace
  * @returns {Object}
  */
-function getHeaders(expires, minExpiry, grace = 0) {
+function generateHeaders(expires, minExpiry, grace = 0) {
   const now = Date.now();
 
   if (!expires || expires < now) {
@@ -227,12 +255,12 @@ function getHeaders(expires, minExpiry, grace = 0) {
 /**
  * Check if 'obj' has expired
  * @param {Object} obj
- * @param {String} expiresKey
+ * @param {String} headersKey
  * @returns {Boolean}
  */
-function hasExpired(obj, expiresKey) {
+function hasExpired(obj, headersKey) {
   // Round up to nearest second
   const now = Math.ceil(Date.now() / 1000) * 1000;
 
-  return !(obj && isPlainObject(obj) && expiresKey in obj && now < obj[expiresKey]);
+  return !(obj && isPlainObject(obj) && headersKey in obj && now < obj[headersKey].expires);
 }

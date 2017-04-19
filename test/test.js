@@ -618,7 +618,7 @@ describe('FetchableDataStore', () => {
       store.useHandler(context => {
         if (context.method === 'fetch') {
           run++;
-          expect(context.store).to.have.property('EXPIRES_KEY', '__expires');
+          expect(context.store).to.have.property('HEADERS_KEY', '__headers');
         }
       });
 
