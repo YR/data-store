@@ -184,15 +184,17 @@ function parseCacheControl(cacheControlString) {
   let staleWhileRevalidate = 0;
 
   if (cacheControlString && typeof cacheControlString === 'string') {
-    let match;
+    let match, value;
 
     while ((match = RE_CACHE_CONTROL.exec(cacheControlString))) {
       if (match[1]) {
-        maxAge = parseInt(match[1], 10);
+        maxAge = staleIfError = staleWhileRevalidate = parseInt(match[1], 10);
       } else if (match[2]) {
-        staleWhileRevalidate = parseInt(match[2], 10);
+        value = parseInt(match[2], 10);
+        staleWhileRevalidate = value > maxAge ? value : maxAge;
       } else if (match[3]) {
-        staleIfError = parseInt(match[3], 10);
+        value = parseInt(match[3], 10);
+        staleIfError = value > maxAge ? value : maxAge;
       }
     }
   }
@@ -218,9 +220,9 @@ function mergeCacheControl(cacheControl, defaultCacheControl) {
   const maxAge = 'maxAge' in cacheControl ? cacheControl.maxAge : defaultCacheControl.maxAge;
   const staleWhileRevalidate =
     cacheControl.staleWhileRevalidate ||
-    Math.max(defaultCacheControl.staleWhileRevalidate - defaultCacheControl.maxAge, 0);
+    defaultCacheControl.staleWhileRevalidate - defaultCacheControl.maxAge;
   const staleIfError =
-    cacheControl.staleIfError || Math.max(defaultCacheControl.staleIfError - defaultCacheControl.maxAge, 0);
+    cacheControl.staleIfError || defaultCacheControl.staleIfError - defaultCacheControl.maxAge;
 
   return {
     maxAge,

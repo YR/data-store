@@ -547,7 +547,7 @@ describe('FetchableDataStore', () => {
         );
       return store.fetch('foo', 'http://localhost/foo').then(response => {
         expect(response.body).to.have.property('foo', 'foo');
-        expect(response.headers['cache-control']).to.equal('public, max-age=10, stale-while-revalidate=30, stale-if-error=60');
+        expect(response.headers['cache-control']).to.equal('public, max-age=10, stale-while-revalidate=10, stale-if-error=10');
       });
     });
     it('should reject when failure loading and "options.rejectOnError=true"', () => {
