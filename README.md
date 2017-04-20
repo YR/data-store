@@ -200,11 +200,11 @@ The returned Promise resolves with a `response` object:
 
 `options` include:
 - **`abort: Boolean`** abort existing (outstanding) request to same url [default: `false`]
+- **`cacheControl: String`** default `cache-control` header to determine value expiry [default: `"public, max-age=120, stale-while-revalidate=150, stale-if-error=180"`]
 - **`ignoreQuery: Boolean`** ignore query parameters of `url` when matching existing, oustanding requests for the same url [default: `false`]
 - **`minExpiry: Number`** the minimum expiry (in ms) to use in cases of invalid `expires` [default: `60000`]
 - **`retries: Number`** the number of times to retry load on error [default: `2`]
-- **`staleWhileRevalidate: Boolean`** specify whether to resolve returned promise with stale value or wait for loaded [default: `false`]
-- **`staleIfError: Boolean`** specify whether to resolve returned promise with stale value or reject after load error [default: `false`]
+- **`rejectOnError: Boolean`** specify whether to reject on error or resolve with stale value [default: `true`]
 - **`timeout: Number`** the timeout duration (in ms) before attempting retry [default: `5000`]
 
 #### `fetchAll (keys: Array, options: Object): Promise`
@@ -277,11 +277,11 @@ console.log(childCursor.get('0') === store.get('foo/bar/boo/0')); //=> true
 In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a key (url path) with a handler function. In practice, this enables observation, delegation, middleware, and side effects for the following methods:
 
 **`DataStore`**
-- `set/setAll`
+- `set`
 - `reset`
 
 **`FetchableDataStore`**
-- `fetch/fetchAll`
+- `fetch`
 
 Handlers are registered with `DataStore.useHandler(match: String|RegExp|Array, handler: Function)`, and will route an operation matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in series.
 
@@ -325,4 +325,14 @@ store.registerAction(DO_FOO, function (store, bar) {
 store.trigger(DO_FOO, 'bat');
 ```
 
-Actions can optionally return a resolved or rejected `Promise`.
+Actions can optionally return a resolved or rejected `Promise`:
+
+```js
+const DO_BAR = 'do bar';
+store.registerAction(DO_BAR, function (store, bar) {
+  return Promise.resolve('bar');
+});
+store.trigger(DO_BAR, 'bat').then(function (value) {
+  console.log(value); //=> 'bar'
+});
+```
