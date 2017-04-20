@@ -227,9 +227,9 @@ function parseLoadHeaders(headers, defaultCacheControl) {
  * @param {Boolean} isError
  * @returns {Object}
  */
-function generateResponseHeaders(headers, defaultCacheControl, isError) {
+function generateResponseHeaders(headers = {}, defaultCacheControl, isError) {
   const cacheControl = assign({}, defaultCacheControl, headers.cacheControl);
-  const expires = isError ? headers.expires + cacheControl.staleIfError - cacheControl.maxAge : headers.expires;
+  const expires = isError ? headers.expires + ((cacheControl.staleIfError - cacheControl.maxAge) * 1000) : headers.expires;
   const now = Date.now();
   // Round up to nearest second
   const maxAge = Math.ceil((expires - now) / 1000);
@@ -244,7 +244,7 @@ function generateResponseHeaders(headers, defaultCacheControl, isError) {
 
   return {
     'cache-control': cacheControlString,
-    expires: new Date(expires).toUTCString()
+    expires: new Date(now + (maxAge * 1000)).toUTCString()
   };
 }
 
@@ -255,15 +255,15 @@ function generateResponseHeaders(headers, defaultCacheControl, isError) {
  * @returns {Boolean}
  */
 function hasExpired(headers, isError) {
-  if (!headers && !headers.cacheControl) {
+  if (!headers || !headers.cacheControl) {
     return false;
   }
 
-  const { expires, cacheControl: { maxAge, staleIfError, staleWhileRevalidate } } = headers;
+  const { expires, cacheControl: { maxAge = 0, staleIfError = 0, staleWhileRevalidate = 0 } } = headers;
 
-  // Round up to nearest second
   return (
+    // Round up to nearest second
     Math.ceil(Date.now() / 1000) * 1000 >
-    expires + (staleWhileRevalidate - maxAge) + (isError ? staleIfError - maxAge : 0)
+    expires + ((staleWhileRevalidate - maxAge + (isError ? staleIfError - maxAge : 0)) * 1000)
   );
 }
