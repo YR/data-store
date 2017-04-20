@@ -179,24 +179,53 @@ function load(store, key, url, options) {
  * @returns {Object}
  */
 function parseCacheControl(cacheControlString) {
+  let maxAge = 0;
+  let staleIfError = 0;
+  let staleWhileRevalidate = 0;
+
   if (cacheControlString && typeof cacheControlString === 'string') {
-    const match = cacheControlString.match(RE_CACHE_CONTROL);
+    let match;
 
-    if (match) {
-      const [, maxAge, staleWhileRevalidate, staleIfError] = match;
-
-      return {
-        maxAge: maxAge ? parseInt(maxAge, 10) : 0,
-        staleWhileRevalidate: staleWhileRevalidate ? parseInt(staleWhileRevalidate, 10) : 0,
-        staleIfError: staleIfError ? parseInt(staleIfError, 10) : 0
-      };
+    while ((match = RE_CACHE_CONTROL.exec(cacheControlString))) {
+      if (match[1]) {
+        maxAge = parseInt(match[1], 10);
+      } else if (match[2]) {
+        staleWhileRevalidate = parseInt(match[2], 10);
+      } else if (match[3]) {
+        staleIfError = parseInt(match[3], 10);
+      }
     }
   }
 
   return {
-    maxAge: 0,
-    staleWhileRevalidate: 0,
-    staleIfError: 0
+    maxAge,
+    staleWhileRevalidate,
+    staleIfError
+  };
+}
+
+/**
+ * Merge 'cacheControl' with defaults
+ * @param {Object} cacheControl
+ * @param {Object} defaultCacheControl
+ * @returns {Object}
+ */
+function mergeCacheControl(cacheControl, defaultCacheControl) {
+  if (cacheControl == null) {
+    return assign({}, defaultCacheControl);
+  }
+
+  const maxAge = 'maxAge' in cacheControl ? cacheControl.maxAge : defaultCacheControl.maxAge;
+  const staleWhileRevalidate =
+    cacheControl.staleWhileRevalidate ||
+    Math.max(defaultCacheControl.staleWhileRevalidate - defaultCacheControl.maxAge, 0);
+  const staleIfError =
+    cacheControl.staleIfError || Math.max(defaultCacheControl.staleIfError - defaultCacheControl.maxAge, 0);
+
+  return {
+    maxAge,
+    staleWhileRevalidate,
+    staleIfError
   };
 }
 
@@ -215,7 +244,7 @@ function parseLoadHeaders(headers, defaultCacheControl) {
   }
 
   return {
-    cacheControl: assign({}, defaultCacheControl, parseCacheControl(headers['cache-control'])),
+    cacheControl: mergeCacheControl(parseCacheControl(headers['cache-control']), defaultCacheControl),
     expires: now > expires ? now + defaultCacheControl.maxAge * 1000 : expires
   };
 }
@@ -228,8 +257,10 @@ function parseLoadHeaders(headers, defaultCacheControl) {
  * @returns {Object}
  */
 function generateResponseHeaders(headers = {}, defaultCacheControl, isError) {
-  const cacheControl = assign({}, defaultCacheControl, headers.cacheControl);
-  const expires = isError ? headers.expires + ((cacheControl.staleIfError - cacheControl.maxAge) * 1000) : headers.expires;
+  const cacheControl = mergeCacheControl(headers.cacheControl, defaultCacheControl);
+  const expires = isError
+    ? headers.expires + (cacheControl.staleIfError - cacheControl.maxAge) * 1000
+    : headers.expires;
   const now = Date.now();
   // Round up to nearest second
   const maxAge = Math.ceil((expires - now) / 1000);
@@ -244,7 +275,7 @@ function generateResponseHeaders(headers = {}, defaultCacheControl, isError) {
 
   return {
     'cache-control': cacheControlString,
-    expires: new Date(now + (maxAge * 1000)).toUTCString()
+    expires: new Date(now + maxAge * 1000).toUTCString()
   };
 }
 
@@ -264,6 +295,6 @@ function hasExpired(headers, isError) {
   return (
     // Round up to nearest second
     Math.ceil(Date.now() / 1000) * 1000 >
-    expires + ((staleWhileRevalidate - maxAge + (isError ? staleIfError - maxAge : 0)) * 1000)
+    expires + (staleWhileRevalidate - maxAge + (isError ? staleIfError - maxAge : 0)) * 1000
   );
 }
