@@ -510,36 +510,34 @@ describe('FetchableDataStore', () => {
       nock.cleanAll();
     });
 
-    it('should return an empty response if missing "key"', () => {
+    it('should resolve with empty response if missing "key"', () => {
       return store.fetch(null, 'bar', {}).then(response => {
         expect(response.body).to.equal(undefined);
         expect(response.status).to.equal(400);
       });
     });
-    it('should return an empty response if missing "url"', () => {
-      return store.fetch('foo', null, {}).then(response => {
-        expect(response.body).to.eql({
-          bar: 'boo',
-          boo: {
-            bar: 'foo'
-          }
-        });
+    it('should resolve with empty response if missing "url"', () => {
+      return store.fetch('boop', null, {}).then(response => {
         expect(response.status).to.equal(400);
       });
     });
-    it('should return a Promise with the value', () => {
-      store.set('foo/boo/__expires', Infinity);
+    it('should resolve with stale value', () => {
+      store.set('foo/boo/__headers', { expires: Infinity, cacheControl: {} });
       return store.fetch('foo/boo', 'foo', {}).then(response => {
         expect(response.body).to.have.property('bar', 'foo');
       });
     });
-    it('should return a Promise with stale value when "options.staleWhileRevalidate = true"', () => {
-      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: true }).then(response => {
-        expect(response.body).to.not.have.property('foo');
-        expect(response.headers['cache-control']).to.equal('public, max-age=5');
+    it('should resolve with stale value if "staleWhileRevalidate"', () => {
+      store.set('foo/boo/__headers', {
+        expires: Date.now() - 1000,
+        cacheControl: { maxAge: 0, staleWhileRevalidate: 10 }
+      });
+      return store.fetch('foo/boo', 'foo', {}).then(response => {
+        expect(response.body).to.have.property('bar', 'foo');
       });
     });
-    it('should return a Promise with fresh value when "options.staleWhileRevalidate = false"', () => {
+    it('should resolve with fresh value', () => {
+      store.set('foo/__headers', { expires: 0, cacheControl: {} });
       fake
         .get('/foo')
         .reply(
@@ -547,24 +545,15 @@ describe('FetchableDataStore', () => {
           { foo: 'foo' },
           { 'cache-control': 'public, max-age=10', expires: new Date(Date.now() + 10000).toUTCString() }
         );
-      return store.fetch('foo', 'http://localhost/foo', { staleWhileRevalidate: false }).then(response => {
+      return store.fetch('foo', 'http://localhost/foo').then(response => {
         expect(response.body).to.have.property('foo', 'foo');
-        expect(response.headers['cache-control']).to.equal('public, max-age=10');
+        expect(response.headers['cache-control']).to.equal('public, max-age=10, stale-while-revalidate=10, stale-if-error=10');
       });
     });
-    it('should return a Promise with stale value when "options.staleIfError = true" and value', () => {
-      fake.get('/foo').replyWithError(500);
-      return store.fetch('foo', 'http://localhost/foo', { staleIfError: true }).then(response => {
-        expect(store.get('foo')).to.eql({ bar: 'boo', boo: { bar: 'foo' } });
-        expect(response.body).to.have.property('bar', 'boo');
-        expect(response.headers['cache-control']).to.equal('public, max-age=120');
-        expect(response.status).to.equal(500);
-      });
-    });
-    it('should return a rejected Promise when failure loading', () => {
+    it('should reject when failure loading and "options.rejectOnError=true"', () => {
       fake.get('/beep').replyWithError('oops');
       return store
-        .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 100 })
+        .fetch('beep', 'http://localhost/beep', { rejectOnError: true, retry: 0, timeout: 100 })
         .then(response => {
           throw Error('expected an error');
         })
@@ -573,34 +562,46 @@ describe('FetchableDataStore', () => {
           expect(err.status).to.equal(500);
         });
     });
-    it('should return a rejected Promise when "options.staleIfError = false" and existing value', () => {
-      fake.get('/foo').replyWithError(500);
-      return store
-        .fetch('foo', 'http://localhost/foo', { staleIfError: false })
-        .then(response => {
-          throw Error('expected an error');
-        })
-        .catch(err => {
-          expect(store.get('foo')).to.equal(undefined);
-          expect(err.status).to.equal(500);
-        });
+    it('should resolve with stale value when failure loading and "options.rejectOnError=false"', () => {
+      store.set('foo/__headers', {
+        expires: Date.now(),
+        cacheControl: { maxAge: 0, staleWhileRevalidate: 0, staleIfError: 60 }
+      });
+      fake.get('/foo').delay(10).replyWithError(500);
+      return store.fetch('foo', 'http://localhost/foo', { rejectOnError: false }).then(response => {
+        expect(response.body).to.have.property('bar', 'boo');
+        expect(response.headers['cache-control']).to.equal(
+          'public, max-age=60, stale-while-revalidate=90, stale-if-error=120'
+        );
+        expect(Number(new Date(response.headers.expires)) - Date.now()).to.be.greaterThan(59000).lessThan(61000);
+        expect(response.status).to.equal(500);
+      });
     });
-    it('should return a rejected Promise when "options.staleIfError = false" and no existing value', () => {
-      fake.get('/zoop').replyWithError(500);
+    it('should reject when failure loading and "options.rejectOnError=false" and stale', () => {
+      store.set('foo/__headers', {
+        expires: Date.now(),
+        cacheControl: { maxAge: 120, staleWhileRevalidate: 120, staleIfError: 120 }
+      });
+      fake.get('/foo').delay(10).replyWithError(500);
       return store
-        .fetch('zoop', 'http://localhost/zoop', { staleIfError: false })
+        .fetch('foo', 'http://localhost/foo', { rejectOnError: false })
         .then(response => {
           throw Error('expected an error');
         })
         .catch(err => {
-          expect(store.get('zoop')).to.equal(undefined);
+          expect(err.body).to.equal(undefined);
           expect(err.status).to.equal(500);
         });
     });
     it('should do nothing when loading aborted', done => {
       fake.get('/beep').delayConnection(50).reply(200, { beep: 'beep' });
 
-      store.fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 }).then(done).catch(done);
+      store
+        .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
+        .then(response => {
+          throw Error('expected an error');
+        })
+        .catch(done);
       agent.abortAll();
       setTimeout(done, 100);
     });
@@ -618,7 +619,7 @@ describe('FetchableDataStore', () => {
       store.useHandler(context => {
         if (context.method === 'fetch') {
           run++;
-          expect(context.store).to.have.property('EXPIRES_KEY', '__expires');
+          expect(context.store).to.have.property('HEADERS_KEY', '__headers');
         }
       });
 
@@ -629,9 +630,18 @@ describe('FetchableDataStore', () => {
   });
 
   describe('fetchAll()', () => {
-    it('should return a Promise for array batch fetching', () => {
+    beforeEach(() => {
+      fake = nock('http://localhost');
+    });
+    afterEach(() => {
+      nock.cleanAll();
+    });
+    it('should resolve with array for batch fetching', () => {
       fake.get('/foo').reply(200, { foo: 'foo' }).get('/bar').reply(200, { bar: 'bar' });
-      store.setAll({ 'foo/__expires': 0, 'bar/__expires': 0 });
+      store.setAll({
+        'foo/__headers': { expires: 0, cacheControl: {} },
+        'bar/__headers': { expires: 0, cacheControl: {} }
+      });
 
       return store
         .fetchAll([
