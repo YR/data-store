@@ -200,7 +200,7 @@ The returned Promise resolves with a `response` object:
 
 `options` include:
 - **`abort: Boolean`** abort existing (outstanding) request to same url [default: `false`]
-- **`cacheControl: String`** default `cache-control` header to determine value expiry [default: `"public, max-age=120, stale-while-revalidate=150, stale-if-error=180"`]
+- **`cacheControl: String`** default `cache-control` header to determine value expiry [default: `"public, max-age=120, stale-if-error=180"`]
 - **`ignoreQuery: Boolean`** ignore query parameters of `url` when matching existing, oustanding requests for the same url [default: `false`]
 - **`minExpiry: Number`** the minimum expiry (in ms) to use in cases of invalid `expires` [default: `60000`]
 - **`retries: Number`** the number of times to retry load on error [default: `2`]
