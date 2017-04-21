@@ -522,22 +522,13 @@ describe('FetchableDataStore', () => {
       });
     });
     it('should resolve with stale value', () => {
-      store.set('foo/boo/__headers', { expires: Infinity, cacheControl: {} });
-      return store.fetch('foo/boo', 'foo', {}).then(response => {
-        expect(response.body).to.have.property('bar', 'foo');
-      });
-    });
-    it('should resolve with stale value if "staleWhileRevalidate"', () => {
-      store.set('foo/boo/__headers', {
-        expires: Date.now() - 1000,
-        cacheControl: { maxAge: 0, staleWhileRevalidate: 10 }
-      });
+      store.set('foo/boo/__expiry', { expires: Infinity, expiresIfError: Infinity });
       return store.fetch('foo/boo', 'foo', {}).then(response => {
         expect(response.body).to.have.property('bar', 'foo');
       });
     });
     it('should resolve with fresh value', () => {
-      store.set('foo/__headers', { expires: 0, cacheControl: {} });
+      store.set('foo/__expiry', { expires: 0, expiresIfError: 0 });
       fake
         .get('/foo')
         .reply(
@@ -547,9 +538,7 @@ describe('FetchableDataStore', () => {
         );
       return store.fetch('foo', 'http://localhost/foo').then(response => {
         expect(response.body).to.have.property('foo', 'foo');
-        expect(response.headers['cache-control']).to.equal(
-          'public, max-age=10, stale-while-revalidate=10, stale-if-error=10'
-        );
+        expect(response.headers['cache-control']).to.equal('public, max-age=10');
       });
     });
     it('should reject when failure loading and "options.rejectOnError=true"', () => {
@@ -565,31 +554,29 @@ describe('FetchableDataStore', () => {
         });
     });
     it('should resolve with stale value when failure loading and "options.rejectOnError=false"', () => {
-      store.set('foo/__headers', {
-        expires: Date.now(),
-        cacheControl: { maxAge: 0, staleWhileRevalidate: 0, staleIfError: 60 }
-      });
+      store.set('foo/__expiry', { expires: Date.now(), expiresIfError: Date.now() + 60000 });
       fake.get('/foo').delay(10).replyWithError(500);
       return store.fetch('foo', 'http://localhost/foo', { rejectOnError: false }).then(response => {
         expect(response.body).to.have.property('bar', 'boo');
-        expect(response.headers['cache-control']).to.equal(
-          'public, max-age=60, stale-while-revalidate=90, stale-if-error=120'
-        );
+        expect(response.headers['cache-control']).to.equal('public, max-age=60');
         expect(Number(new Date(response.headers.expires)) - Date.now()).to.be.greaterThan(59000).lessThan(61000);
         expect(response.status).to.equal(200);
       });
     });
-    it('should resolve with no value when failure loading and "options.rejectOnError=false" and stale', () => {
-      store.set('foo/__headers', {
-        expires: Date.now(),
-        cacheControl: { maxAge: 120, staleWhileRevalidate: 120, staleIfError: 120 }
+    it('should limit response maxAge when resolving with stale value when failure loading and "options.rejectOnError=false"', () => {
+      store.set('foo/__expiry', { expires: Date.now(), expiresIfError: Date.now() + 1800000 });
+      fake.get('/foo').delay(10).replyWithError(500);
+      return store.fetch('foo', 'http://localhost/foo', { rejectOnError: false }).then(response => {
+        expect(response.body).to.have.property('bar', 'boo');
+        expect(response.headers['cache-control']).to.equal('public, max-age=120');
       });
+    });
+    it('should resolve with no value when failure loading and "options.rejectOnError=false" and stale', () => {
+      store.set('foo/__expiry', { expires: Date.now(), expiresIfError: Date.now() + 5 });
       fake.get('/foo').delay(10).replyWithError(500);
       return store.fetch('foo', 'http://localhost/foo', { rejectOnError: false }).then(response => {
         expect(response.body).to.equal(undefined);
-        expect(response.headers['cache-control']).to.equal(
-          'public, max-age=120, stale-while-revalidate=120, stale-if-error=120'
-        );
+        expect(response.headers['cache-control']).to.equal('public, max-age=120');
         expect(Number(new Date(response.headers.expires)) - Date.now()).to.be.greaterThan(119000).lessThan(121000);
         expect(response.status).to.equal(500);
       });
@@ -620,7 +607,7 @@ describe('FetchableDataStore', () => {
       store.useHandler(context => {
         if (context.method === 'fetch') {
           run++;
-          expect(context.store).to.have.property('HEADERS_KEY', '__headers');
+          expect(context.store).to.have.property('EXPIRY_KEY', '__expiry');
         }
       });
 
@@ -640,8 +627,8 @@ describe('FetchableDataStore', () => {
     it('should resolve with array for batch fetching', () => {
       fake.get('/foo').reply(200, { foo: 'foo' }).get('/bar').reply(200, { bar: 'bar' });
       store.setAll({
-        'foo/__headers': { expires: 0, cacheControl: {} },
-        'bar/__headers': { expires: 0, cacheControl: {} }
+        'foo/__expiry': { expires: 0, expiresIfError: {} },
+        'bar/__expiry': { expires: 0, expiresIfError: {} }
       });
 
       return store

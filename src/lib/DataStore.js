@@ -12,7 +12,7 @@ const HANDLED_METHODS = {
   reset: [reset, ['data']],
   set: [set, ['key', 'value', 'options']]
 };
-const HEADERS_KEY = '__headers';
+const EXPIRY_KEY = '__expiry';
 const REF_KEY = '__ref:';
 
 let uid = 0;
@@ -28,7 +28,7 @@ module.exports = class DataStore {
    *  - {Object} serialisableKeys
    */
   constructor(id, data, options = {}) {
-    this.HEADERS_KEY = HEADERS_KEY;
+    this.EXPIRY_KEY = EXPIRY_KEY;
     this.REF_KEY = REF_KEY;
 
     this.changed = false;
