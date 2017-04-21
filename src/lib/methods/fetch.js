@@ -62,8 +62,8 @@ function fetch(store, key, url, options) {
 function doFetch(store, key, url, options) {
   const { cacheControl, rejectOnError } = options;
   const value = get(store, key);
-  const isExpired = hasExpired(value && value[store.HEADERS_KEY], false);
   const isMissing = !value;
+  let isExpired = hasExpired(value && value[store.HEADERS_KEY], false);
 
   store.debug('fetch %s from %s', key, url);
 
@@ -95,17 +95,20 @@ function doFetch(store, key, url, options) {
           });
         })
         .catch(err => {
-          if (rejectOnError || hasExpired(value && value[store.HEADERS_KEY], true)) {
+          isExpired = hasExpired(value && value[store.HEADERS_KEY], true);
+
+          if (rejectOnError && isExpired) {
             return reject(err);
           }
+
           store.debug('fetched stale %s after load error', key);
           return resolve({
-            body: value,
+            body: isExpired ? undefined : value,
             duration: 0,
             error: err,
             headers: generateResponseHeaders(value && value[store.HEADERS_KEY], cacheControl, true),
             key,
-            status: err.status
+            status: isExpired ? err.status : 200
           });
         });
     });
@@ -289,7 +292,7 @@ function generateResponseHeaders(headers = {}, defaultCacheControl, isError) {
  */
 function hasExpired(headers, isError) {
   if (!headers || !headers.cacheControl) {
-    return false;
+    return true;
   }
 
   const { expires, cacheControl: { maxAge = 0, staleIfError = 0, staleWhileRevalidate = 0 } } = headers;
