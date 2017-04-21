@@ -579,7 +579,7 @@ describe('FetchableDataStore', () => {
         expect(response.status).to.equal(200);
       });
     });
-    it.only('should resolve with no value when failure loading and "options.rejectOnError=false" and stale', () => {
+    it('should resolve with no value when failure loading and "options.rejectOnError=false" and stale', () => {
       store.set('foo/__headers', {
         expires: Date.now(),
         cacheControl: { maxAge: 120, staleWhileRevalidate: 120, staleIfError: 120 }
@@ -588,9 +588,9 @@ describe('FetchableDataStore', () => {
       return store.fetch('foo', 'http://localhost/foo', { rejectOnError: false }).then(response => {
         expect(response.body).to.equal(undefined);
         expect(response.headers['cache-control']).to.equal(
-          'public, max-age=60, stale-while-revalidate=90, stale-if-error=120'
+          'public, max-age=120, stale-while-revalidate=120, stale-if-error=120'
         );
-        expect(Number(new Date(response.headers.expires)) - Date.now()).to.be.greaterThan(59000).lessThan(61000);
+        expect(Number(new Date(response.headers.expires)) - Date.now()).to.be.greaterThan(119000).lessThan(121000);
         expect(response.status).to.equal(500);
       });
     });

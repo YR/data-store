@@ -222,10 +222,8 @@ function mergeCacheControl(cacheControl, defaultCacheControl) {
 
   const maxAge = 'maxAge' in cacheControl ? cacheControl.maxAge : defaultCacheControl.maxAge;
   const staleWhileRevalidate =
-    cacheControl.staleWhileRevalidate ||
-    defaultCacheControl.staleWhileRevalidate - defaultCacheControl.maxAge;
-  const staleIfError =
-    cacheControl.staleIfError || defaultCacheControl.staleIfError - defaultCacheControl.maxAge;
+    cacheControl.staleWhileRevalidate || defaultCacheControl.staleWhileRevalidate - defaultCacheControl.maxAge;
+  const staleIfError = cacheControl.staleIfError || defaultCacheControl.staleIfError - defaultCacheControl.maxAge;
 
   return {
     maxAge,
@@ -268,7 +266,7 @@ function generateResponseHeaders(headers = {}, defaultCacheControl, isError) {
     : headers.expires;
   const now = Date.now();
   // Round up to nearest second
-  const maxAge = Math.ceil((expires - now) / 1000);
+  const maxAge = expires > now ? Math.ceil((expires - now) / 1000) : defaultCacheControl.maxAge;
   let cacheControlString = `public, max-age=${maxAge}`;
 
   if (cacheControl.staleWhileRevalidate) {
