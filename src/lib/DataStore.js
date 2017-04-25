@@ -169,20 +169,24 @@ module.exports = class DataStore {
    * Retrieve value stored at 'key'
    * Empty/null/undefined 'key' returns all data
    * @param {String} [key]
+   * @param {Object} [options]
+   *  - {Boolean} resolveReferences
    * @returns {*}
    */
-  get(key) {
-    return get(this, key);
+  get(key, options) {
+    return get(this, key, options);
   }
 
   /**
    * Batch version of 'get()'
    * Accepts array of 'keys'
    * @param {Array} keys
+   * @param {Object} [options]
+   *  - {Boolean} resolveReferences
    * @returns {Array}
    */
-  getAll(keys) {
-    return keys.map(key => get(this, key));
+  getAll(keys, options) {
+    return keys.map(key => get(this, key, options));
   }
 
   /**

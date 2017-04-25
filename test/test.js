@@ -70,11 +70,20 @@ describe('DataStore', () => {
     it('should return a referenced value when passed a reference key', () => {
       expect(store.get('__ref:boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
     });
+    it('should return a referenced value when passed a reference key and "options.resolveReferences = false"', () => {
+      expect(store.get('__ref:boo', { resolveReferences: false })).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
+    });
     it('should return a resolved object of referenced values', () => {
       expect(store.get('foo')).to.eql({ bar: 'foo', boo: { bar: 'foo', bat: { foo: 'foo' } }, bat: 'bat' });
     });
+    it('should not return a resolved object of referenced values if "options.resolveReferences = false"', () => {
+      expect(store.get('foo', { resolveReferences: false })).to.eql({ bar: 'foo', boo: '__ref:boo', bat: '__ref:bar' });
+    });
     it('should return a resolved array of referenced values', () => {
       expect(store.get('boop')).to.eql(['bat', ['foo', 'bar']]);
+    });
+    it('should not return a resolved array of referenced values if "options.resolveReferences = false"', () => {
+      expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
     });
   });
 
