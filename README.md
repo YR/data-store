@@ -89,12 +89,15 @@ Trigger action registered with `name` (see [actions](#actions)):
 store.trigger('do bar with id', id);
 ```
 
-#### `get (key: String): *`
+#### `get (key: String, options: Object): *`
 Retrieve value stored at `key`. Empty key will return all data:
 
 ```js
-store.get(['foo/bar/bat', 'bar']); //=> [true, false]
+store.get('foo/bar/bat'); //=> true
 ```
+
+`options` include:
+- **`resolveReferences: Boolean`** specify whether to resolve nested reference keys back to their original values [default: `true`]
 
 #### `getAll (keys: Array): Array`
 Batch version of `get()`. Accepts array of `keys`, and returns array of `values`:
