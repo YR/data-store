@@ -229,6 +229,11 @@ describe('DataStore', () => {
 
         expect(cursor2.get('/bat')).to.equal('zip');
       });
+      it('should allow access to ref properties', () => {
+        const cursor = store.createCursor('foo');
+
+        expect(cursor.get('__ref:bar')).to.equal('bat');
+      });
       it('should access updated data after update to store', () => {
         const cursor = store.createCursor('foo');
 

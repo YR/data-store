@@ -70,6 +70,6 @@ module.exports = class DataStoreCursor {
    * @returns {Boolean}
    */
   _isRootKey(key) {
-    return key ? key.charAt(0) === '/' : false;
+    return key ? key.charAt(0) === '/' || this.dataStore._isRefValue(key) : false;
   }
 };
