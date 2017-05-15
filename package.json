@@ -1,7 +1,7 @@
 {
   "name": "@yr/data-store",
   "description": "A clever data object",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "author": "Alexander Pope <alexander.pope@nrk.no>",
   "dependencies": {
     "@yr/agent": "5.0.x",
