@@ -1,10 +1,11 @@
 'use strict';
 
 const { create: createStore } = require('../src/index');
+const { expect } = require('chai');
 const agent = require('@yr/agent');
-const expect = require('expect.js');
 const HandlerContext = require('../src/lib/HandlerContext');
 const nock = require('nock');
+
 let fake, store;
 
 describe('DataStore', () => {
@@ -32,7 +33,6 @@ describe('DataStore', () => {
 
   describe('constructor', () => {
     it('should instantiate with passed data', () => {
-      expect(store.get).to.be.a(Function);
       expect(store._data).to.have.property('bar', 'bat');
     });
     it('should instantiate with id', () => {
