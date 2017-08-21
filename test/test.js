@@ -86,12 +86,12 @@ describe('DataStore', () => {
       expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
     });
     it('should cache read results if not writeable', () => {
-      store.isWritable = false;
+      store.setWriteable(false);
       expect(store.get('boo/bat/foo')).to.equal('foo');
       expect(store._cache).to.have.property('boo/bat/foo:true', 'foo');
     });
     it('should cache read results if not writeable, respecting "options.resolveReferences"', () => {
-      store.isWritable = false;
+      store.setWriteable(false);
       expect(store.get('boop')).to.eql(['bat', ['foo', 'bar']]);
       expect(store._cache).to.have.property('boop:true');
       expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
@@ -114,10 +114,14 @@ describe('DataStore', () => {
       store.set(null, 'bar');
       expect(store._data).to.equal(data);
     });
-    it('should do nothing if dataStore is not writable', () => {
-      store.isWritable = false;
-      store.set('foo', 'bar');
-      expect(store._data.foo).to.not.equal('bar');
+    it('should throw if dataStore is not writable', () => {
+      store.setWriteable(false);
+      try {
+        store.set('foo', 'bar');
+        expect(false);
+      } catch(err) {
+        expect(store._data.foo).to.not.equal('bar');
+      }
     });
     it('should store a value when called with simple key', () => {
       store.set('foo', 'bar');

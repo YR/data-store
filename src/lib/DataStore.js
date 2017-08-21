@@ -34,7 +34,6 @@ module.exports = class DataStore {
     this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
-    this.isWritable = 'isWritable' in options ? options.isWritable : true;
 
     this._actions = {};
     this._cache = {};
@@ -42,6 +41,7 @@ module.exports = class DataStore {
     // Allow sub classes to send in methods for registration
     this._handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
     this._handlers = [];
+    this._isWritable = 'isWritable' in options ? options.isWritable : true;
     this._serialisableKeys = options.serialisableKeys || {};
 
     this.debug('created');
@@ -149,6 +149,10 @@ module.exports = class DataStore {
    * @returns {Promise}
    */
   trigger(name, ...args) {
+    if (!this._isWritable) {
+      this.setWriteable(true);
+    }
+
     const action = this._actions[name];
 
     if (!action) {
@@ -165,6 +169,20 @@ module.exports = class DataStore {
   }
 
   /**
+   * Set writeable state
+   * @param {Boolean} value
+   */
+  setWriteable(value) {
+    if (value !== this._isWritable) {
+      this._isWritable = value;
+      // Clear cache when toggling.
+      // It would be more efficient to selectively invalidate keys,
+      // but dangerous due to immutability and refs.
+      this._cache = {};
+    }
+  }
+
+  /**
    * Retrieve value stored at 'key'
    * Empty/null/undefined 'key' returns all data
    * @param {String} [key]
@@ -172,17 +190,7 @@ module.exports = class DataStore {
    *  - {Boolean} resolveReferences
    * @returns {*}
    */
-  get(key, options = {}) {
-    if (!this.isWritable) {
-      const { resolveReferences = true } = options;
-      const cacheKey = `${key}:${resolveReferences}`;
-
-      if (!(cacheKey in this._cache)) {
-        this._cache[cacheKey] = get(this, key, options);
-      }
-      return this._cache[cacheKey];
-    }
-
+  get(key, options) {
     return get(this, key, options);
   }
 
@@ -208,8 +216,8 @@ module.exports = class DataStore {
    * @returns {void}
    */
   set(key, value, options) {
-    if (!this.isWritable) {
-      return;
+    if (!this._isWritable) {
+      throw Error(`DataStore ${this.id} is not writeable`);
     }
 
     this.changed = this._routeHandledMethod('set', key, value, options);
@@ -225,8 +233,8 @@ module.exports = class DataStore {
    * @returns {void}
    */
   setAll(keys, options) {
-    if (!this.isWritable) {
-      return;
+    if (!this._isWritable) {
+      throw Error(`DataStore ${this.id} is not writeable`);
     }
 
     let changed = false;
@@ -419,10 +427,6 @@ module.exports = class DataStore {
     // Handle passing of __ref key
     if (this._isRefValue(key)) {
       return this._parseRefKey(key);
-    }
-    // Trim leading '/' (cursors)
-    if (key.charAt(0) === '/') {
-      key = key.slice(1);
     }
 
     const segs = key.split('/');
