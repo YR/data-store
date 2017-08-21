@@ -89,6 +89,9 @@ Trigger action registered with `name` (see [actions](#actions)):
 store.trigger('do bar with id', id);
 ```
 
+#### `setWriteable (value: Boolean)`
+Set the writeable state of a store. A read-only store will internally cache all calls to `get()`. Calling `setWriteable()` to toggle read/write state will invalidate the internal cache.
+
 #### `get (key: String, options: Object): *`
 Retrieve value stored at `key`. Empty key will return all data:
 
