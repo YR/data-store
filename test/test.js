@@ -85,6 +85,19 @@ describe('DataStore', () => {
     it('should not return a resolved array of referenced values if "options.resolveReferences = false"', () => {
       expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
     });
+    it('should cache read results if not writeable', () => {
+      store.isWritable = false;
+      expect(store.get('boo/bat/foo')).to.equal('foo');
+      expect(store._cache).to.have.property('boo/bat/foo:true', 'foo');
+    });
+    it('should cache read results if not writeable, respecting "options.resolveReferences"', () => {
+      store.isWritable = false;
+      expect(store.get('boop')).to.eql(['bat', ['foo', 'bar']]);
+      expect(store._cache).to.have.property('boop:true');
+      expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
+      expect(store._cache).to.have.property('boop:false');
+      expect(store._cache['boob:true']).to.not.equal(store._cache['boop:false']);
+    });
   });
 
   describe('getAll()', () => {

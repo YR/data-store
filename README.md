@@ -154,11 +154,6 @@ Reset/replace underlying data with `data`.
 #### `destroy ()`
 Destroy the instance, including all existing cursors.
 
-```js
-const cursor = store.createCursor('foo/bar');
-cursor.get('bat'); //=> true
-```
-
 #### `setSerialisabilityOfKey (key: String, value: Boolean)`
 Specify serialisablity of `key`. Setting a `key` to `false` will exclude that key when stringifying:
 

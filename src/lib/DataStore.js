@@ -37,6 +37,7 @@ module.exports = class DataStore {
     this.isWritable = 'isWritable' in options ? options.isWritable : true;
 
     this._actions = {};
+    this._cache = {};
     this._data = {};
     // Allow sub classes to send in methods for registration
     this._handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
@@ -171,7 +172,17 @@ module.exports = class DataStore {
    *  - {Boolean} resolveReferences
    * @returns {*}
    */
-  get(key, options) {
+  get(key, options = {}) {
+    if (!this.isWritable) {
+      const { resolveReferences = true } = options;
+      const cacheKey = `${key}:${resolveReferences}`;
+
+      if (!(cacheKey in this._cache)) {
+        this._cache[cacheKey] = get(this, key, options);
+      }
+      return this._cache[cacheKey];
+    }
+
     return get(this, key, options);
   }
 
@@ -289,13 +300,9 @@ module.exports = class DataStore {
    * Destroy instance
    */
   destroy() {
-    // Destroy cursors
-    for (const key in this._cursors) {
-      this._cursors[key].destroy();
-    }
     this.destroyed = true;
     this._actions = {};
-    this._cursors = {};
+    this._cache = {};
     this._data = {};
     this._handlers = [];
     this._serialisableKeys = {};
