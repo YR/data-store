@@ -1,7 +1,6 @@
 'use strict';
 
 const assign = require('object-assign');
-const Cursor = require('./DataStoreCursor');
 const debugFactory = require('debug');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
@@ -38,7 +37,6 @@ module.exports = class DataStore {
     this.isWritable = 'isWritable' in options ? options.isWritable : true;
 
     this._actions = {};
-    this._cursors = {};
     this._data = {};
     // Allow sub classes to send in methods for registration
     this._handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
@@ -302,29 +300,6 @@ module.exports = class DataStore {
     this._handlers = [];
     this._serialisableKeys = {};
     this.debug('destroyed');
-  }
-
-  /**
-   * Retrieve an instance reference at 'key' to a subset of data
-   * @param {String} key
-   * @returns {DataStore}
-   */
-  createCursor(key) {
-    key = this._resolveRefKey(key || '');
-    // Prefix all keys with separator
-    if (key && key.charAt(0) !== '/') {
-      key = `/${key}`;
-    }
-
-    let cursor = this._cursors[key];
-
-    // Create and store
-    if (!cursor) {
-      cursor = new Cursor(key, this);
-      this._cursors[key] = cursor;
-    }
-
-    return cursor;
   }
 
   /**
