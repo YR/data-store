@@ -34,13 +34,22 @@ function doGet(store, key, options = {}) {
   key = store._resolveRefKey(key);
 
   const { resolveReferences = true } = options;
-  const value = property.get(store._data, key);
+  const cacheKey = `${key}:${resolveReferences}`;
+  const shouldCache = !store._isWritable;
+
+  if (shouldCache) {
+    if (store._cache[cacheKey]) {
+      return store._cache[cacheKey];
+    }
+  }
+
+  let value = property.get(store._data, key);
 
   if (resolveReferences) {
     // Shallow resolve embedded references
     // Should in theory mutate value, but may cause false equality with previous
     if (Array.isArray(value)) {
-      return value.map(item => {
+      value = value.map(item => {
         return store._isRefValue(item) ? property.get(store._data, store._parseRefKey(item)) : item;
       });
     } else if (isPlainObject(value)) {
@@ -51,8 +60,13 @@ function doGet(store, key, options = {}) {
           ? property.get(store._data, store._parseRefKey(value[prop]))
           : value[prop];
       }
-      return v;
+
+      value = v;
     }
+  }
+
+  if (shouldCache) {
+    store._cache[cacheKey] = value;
   }
 
   return value;

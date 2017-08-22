@@ -1,10 +1,11 @@
 'use strict';
 
 const { create: createStore } = require('../src/index');
+const { expect } = require('chai');
 const agent = require('@yr/agent');
-const expect = require('expect.js');
 const HandlerContext = require('../src/lib/HandlerContext');
 const nock = require('nock');
+
 let fake, store;
 
 describe('DataStore', () => {
@@ -32,7 +33,6 @@ describe('DataStore', () => {
 
   describe('constructor', () => {
     it('should instantiate with passed data', () => {
-      expect(store.get).to.be.a(Function);
       expect(store._data).to.have.property('bar', 'bat');
     });
     it('should instantiate with id', () => {
@@ -85,6 +85,19 @@ describe('DataStore', () => {
     it('should not return a resolved array of referenced values if "options.resolveReferences = false"', () => {
       expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
     });
+    it('should cache read results if not writeable', () => {
+      store.setWriteable(false);
+      expect(store.get('boo/bat/foo')).to.equal('foo');
+      expect(store._cache).to.have.property('boo/bat/foo:true', 'foo');
+    });
+    it('should cache read results if not writeable, respecting "options.resolveReferences"', () => {
+      store.setWriteable(false);
+      expect(store.get('boop')).to.eql(['bat', ['foo', 'bar']]);
+      expect(store._cache).to.have.property('boop:true');
+      expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
+      expect(store._cache).to.have.property('boop:false');
+      expect(store._cache['boob:true']).to.not.equal(store._cache['boop:false']);
+    });
   });
 
   describe('getAll()', () => {
@@ -101,10 +114,14 @@ describe('DataStore', () => {
       store.set(null, 'bar');
       expect(store._data).to.equal(data);
     });
-    it('should do nothing if dataStore is not writable', () => {
-      store.isWritable = false;
-      store.set('foo', 'bar');
-      expect(store._data.foo).to.not.equal('bar');
+    it('should throw if dataStore is not writable', () => {
+      store.setWriteable(false);
+      try {
+        store.set('foo', 'bar');
+        expect(false);
+      } catch(err) {
+        expect(store._data.foo).to.not.equal('bar');
+      }
     });
     it('should store a value when called with simple key', () => {
       store.set('foo', 'bar');
@@ -169,98 +186,6 @@ describe('DataStore', () => {
   describe('unreferenceAll()', () => {
     it('should return an array of unreferenced keys', () => {
       expect(store.unreferenceAll(['__ref:bar', '__ref:foo/bar'])).to.eql(['bar', 'foo/bar']);
-    });
-  });
-
-  describe('cursors', () => {
-    describe('createCursor()', () => {
-      it('should generate a cursor instance', () => {
-        const cursor = store.createCursor();
-
-        expect(store.get('bar')).to.equal('bat');
-        expect(cursor.get('bar')).to.equal('bat');
-      });
-      it('should generate a cursor instance with a subset of data at "key"', () => {
-        const cursor = store.createCursor('foo');
-
-        expect(store.get('bar')).to.equal('bat');
-        expect(cursor.get('bar')).to.equal('foo');
-      });
-      it('should generate a cursor instance with a subset of data at reference "key"', () => {
-        const cursor = store.createCursor('foo/boo');
-
-        expect(cursor.get('bar')).to.equal('foo');
-        expect(cursor.key).to.equal('/boo');
-      });
-      it('should allow retrieving all cursor properties when no key specified', () => {
-        const cursor = store.createCursor('foo');
-
-        expect(cursor.get()).to.eql({
-          bar: 'foo',
-          boo: {
-            bar: 'foo',
-            bat: {
-              foo: 'foo'
-            }
-          },
-          bat: 'bat'
-        });
-        expect(cursor.get()).to.eql(store.get('foo'));
-      });
-      it('should enable creating a cursor from an existing cursor', () => {
-        const cursor1 = store.createCursor();
-        const cursor2 = cursor1.createCursor('foo');
-
-        expect(store.get('bar')).to.equal('bat');
-        expect(cursor1.get('bar')).to.equal('bat');
-        expect(cursor2.get('bar')).to.equal('foo');
-      });
-      it('should enable creating a cursor from an existing cursor at reference "key"', () => {
-        const cursor1 = store.createCursor('foo');
-        const cursor2 = cursor1.createCursor('boo');
-
-        expect(cursor1.get('boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
-        expect(cursor2.get()).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
-      });
-      it('should allow access to root properties', () => {
-        store.set('bat', 'zip');
-        const cursor1 = store.createCursor('foo');
-        const cursor2 = cursor1.createCursor('boo');
-
-        expect(cursor2.get('/bat')).to.equal('zip');
-      });
-      it('should allow access to ref properties', () => {
-        const cursor = store.createCursor('foo');
-
-        expect(cursor.get('__ref:bar')).to.equal('bat');
-      });
-      it('should access updated data after update to store', () => {
-        const cursor = store.createCursor('foo');
-
-        expect(cursor.get()).to.eql(store.get('foo'));
-        store.set('foo', 'bar');
-        expect(cursor.get()).to.equal('bar');
-      });
-    });
-
-    describe('getAll()', () => {
-      it('should return an array of values', () => {
-        const cursor = store.createCursor('foo');
-
-        expect(cursor.getAll(['bar', 'bat'])).to.eql(['foo', 'bat']);
-      });
-    });
-
-    describe('trigger()', () => {
-      it('should defer to store.trigger()', () => {
-        const cursor = store.createCursor();
-
-        store.registerAction('foo', store => {
-          store.set('foo', 'foo');
-        });
-        cursor.trigger('foo');
-        expect(store.get('foo')).to.equal('foo');
-      });
     });
   });
 

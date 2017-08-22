@@ -89,6 +89,9 @@ Trigger action registered with `name` (see [actions](#actions)):
 store.trigger('do bar with id', id);
 ```
 
+#### `setWriteable (value: Boolean)`
+Set the writeable state of a store. A read-only store will internally cache all calls to `get()`. Calling `setWriteable()` to toggle read/write state will invalidate the internal cache.
+
 #### `get (key: String, options: Object): *`
 Retrieve value stored at `key`. Empty key will return all data:
 
@@ -153,14 +156,6 @@ Reset/replace underlying data with `data`.
 
 #### `destroy ()`
 Destroy the instance, including all existing cursors.
-
-#### `createCursor (key: String): DataStoreCursor`
-Create instance of [`DataStoreCursor`](#datastorecursor) at `key`:
-
-```js
-const cursor = store.createCursor('foo/bar');
-cursor.get('bat'); //=> true
-```
 
 #### `setSerialisabilityOfKey (key: String, value: Boolean)`
 Specify serialisablity of `key`. Setting a `key` to `false` will exclude that key when stringifying:
@@ -234,45 +229,6 @@ store
     // Will never be called
   });
 store.abort('beep');
-```
-
-### `DataStoreCursor`
-Cursors are lightweight objects that scope `read` operations, limiting the need to have full knowledge of deeply nested data structures:
-
-```js
-const cursor = store.createCursor('foo/bar');
-// All get()/getAll() calls are now scoped to 'foo/bar'
-```
-
-#### `trigger (name: String, ...args): Promise`
-Trigger action registered on parent `DataStore` with `name` (see [actions](#actions)):
-
-```js
-store.trigger('do bar with id', id);
-```
-
-#### `get (key: String): *`
-Retrieve value stored at `key`:
-
-```js
-const value = cursor.get('bat');
-console.log(value === store.get('foo/bar/boo')); //=> true
-```
-
-#### `getAll (keys: Array): Array`
-Batch version of `get()`. Accepts array of `keys`, and returns array of `values`:
-
-```js
-const values = cursor.get(['bat', 'boo']);
-console.log(values[1] === store.get('foo/bar/boo')); //=> true
-```
-
-#### `createCursor (key: String): DataStoreCursor`
-Instantiate a new `DataStoreCursor` at `key`, scoped to it's parent:
-
-```js
-const childCursor = cursor.createCursor('boo');
-console.log(childCursor.get('0') === store.get('foo/bar/boo/0')); //=> true
 ```
 
 ## Handlers

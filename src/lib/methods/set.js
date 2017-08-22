@@ -52,5 +52,6 @@ function doSet(store, key, value, options) {
       return false;
     }
   }
+
   return true;
 }

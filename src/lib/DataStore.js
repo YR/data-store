@@ -1,7 +1,6 @@
 'use strict';
 
 const assign = require('object-assign');
-const Cursor = require('./DataStoreCursor');
 const debugFactory = require('debug');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
@@ -35,14 +34,14 @@ module.exports = class DataStore {
     this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
-    this.isWritable = 'isWritable' in options ? options.isWritable : true;
 
     this._actions = {};
-    this._cursors = {};
+    this._cache = {};
     this._data = {};
     // Allow sub classes to send in methods for registration
     this._handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
     this._handlers = [];
+    this._isWritable = 'isWritable' in options ? options.isWritable : true;
     this._serialisableKeys = options.serialisableKeys || {};
 
     this.debug('created');
@@ -150,6 +149,10 @@ module.exports = class DataStore {
    * @returns {Promise}
    */
   trigger(name, ...args) {
+    if (!this._isWritable) {
+      this.setWriteable(true);
+    }
+
     const action = this._actions[name];
 
     if (!action) {
@@ -163,6 +166,20 @@ module.exports = class DataStore {
     const promise = action(this, ...args);
 
     return promise || Promise.resolve();
+  }
+
+  /**
+   * Set writeable state
+   * @param {Boolean} value
+   */
+  setWriteable(value) {
+    if (value !== this._isWritable) {
+      this._isWritable = value;
+      // Clear cache when toggling.
+      // It would be more efficient to selectively invalidate keys,
+      // but dangerous due to immutability and refs.
+      this._cache = {};
+    }
   }
 
   /**
@@ -199,8 +216,8 @@ module.exports = class DataStore {
    * @returns {void}
    */
   set(key, value, options) {
-    if (!this.isWritable) {
-      return;
+    if (!this._isWritable) {
+      throw Error(`DataStore ${this.id} is not writeable`);
     }
 
     this.changed = this._routeHandledMethod('set', key, value, options);
@@ -216,8 +233,8 @@ module.exports = class DataStore {
    * @returns {void}
    */
   setAll(keys, options) {
-    if (!this.isWritable) {
-      return;
+    if (!this._isWritable) {
+      throw Error(`DataStore ${this.id} is not writeable`);
     }
 
     let changed = false;
@@ -291,40 +308,13 @@ module.exports = class DataStore {
    * Destroy instance
    */
   destroy() {
-    // Destroy cursors
-    for (const key in this._cursors) {
-      this._cursors[key].destroy();
-    }
     this.destroyed = true;
     this._actions = {};
-    this._cursors = {};
+    this._cache = {};
     this._data = {};
     this._handlers = [];
     this._serialisableKeys = {};
     this.debug('destroyed');
-  }
-
-  /**
-   * Retrieve an instance reference at 'key' to a subset of data
-   * @param {String} key
-   * @returns {DataStore}
-   */
-  createCursor(key) {
-    key = this._resolveRefKey(key || '');
-    // Prefix all keys with separator
-    if (key && key.charAt(0) !== '/') {
-      key = `/${key}`;
-    }
-
-    let cursor = this._cursors[key];
-
-    // Create and store
-    if (!cursor) {
-      cursor = new Cursor(key, this);
-      this._cursors[key] = cursor;
-    }
-
-    return cursor;
   }
 
   /**
@@ -437,10 +427,6 @@ module.exports = class DataStore {
     // Handle passing of __ref key
     if (this._isRefValue(key)) {
       return this._parseRefKey(key);
-    }
-    // Trim leading '/' (cursors)
-    if (key.charAt(0) === '/') {
-      key = key.slice(1);
     }
 
     const segs = key.split('/');
