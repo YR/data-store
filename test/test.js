@@ -24,7 +24,7 @@ describe('DataStore', () => {
         bat: '__ref:bar'
       },
       bat: ['foo', 'bar'],
-      boop: ['__ref:bar', '__ref:bat']
+      boop: ['__ref:bar', '__ref:foo']
     });
   });
   afterEach(() => {
@@ -70,33 +70,39 @@ describe('DataStore', () => {
     it('should return a referenced value when passed a reference key', () => {
       expect(store.get('__ref:boo')).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
     });
-    it('should return a referenced value when passed a reference key and "options.resolveReferences = false"', () => {
-      expect(store.get('__ref:boo', { resolveReferences: false })).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
+    it('should return a referenced value when passed a reference key and "options.referenceDepth = 0"', () => {
+      expect(store.get('__ref:boo', { referenceDepth: 0 })).to.eql({ bar: 'foo', bat: { foo: 'foo' } });
     });
     it('should return a resolved object of referenced values', () => {
       expect(store.get('foo')).to.eql({ bar: 'foo', boo: { bar: 'foo', bat: { foo: 'foo' } }, bat: 'bat' });
     });
-    it('should not return a resolved object of referenced values if "options.resolveReferences = false"', () => {
-      expect(store.get('foo', { resolveReferences: false })).to.eql({ bar: 'foo', boo: '__ref:boo', bat: '__ref:bar' });
+    it('should not return a resolved object of referenced values if "options.referenceDepth = 0"', () => {
+      expect(store.get('foo', { referenceDepth: 0 })).to.eql({ bar: 'foo', boo: '__ref:boo', bat: '__ref:bar' });
     });
     it('should return a resolved array of referenced values', () => {
-      expect(store.get('boop')).to.eql(['bat', ['foo', 'bar']]);
+      expect(store.get('boop')).to.eql(['bat', { bar: 'foo', boo: '__ref:boo', bat: '__ref:bar' }]);
     });
-    it('should not return a resolved array of referenced values if "options.resolveReferences = false"', () => {
-      expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
+    it('should return a deeply resolved array of referenced values when "options.referenceDepth = 2"', () => {
+      expect(store.get('boop', { referenceDepth: 2 })).to.eql([
+        'bat',
+        { bar: 'foo', boo: { bar: 'foo', bat: { foo: 'foo' } }, bat: 'bat' }
+      ]);
+    });
+    it('should not return a resolved array of referenced values if "options.referenceDepth = 0"', () => {
+      expect(store.get('boop', { referenceDepth: 0 })).to.eql(['__ref:bar', '__ref:foo']);
     });
     it('should cache read results if not writeable', () => {
       store.setWriteable(false);
       expect(store.get('boo/bat/foo')).to.equal('foo');
-      expect(store._cache).to.have.property('boo/bat/foo:true', 'foo');
+      expect(store._cache).to.have.property('boo/bat/foo:1', 'foo');
     });
-    it('should cache read results if not writeable, respecting "options.resolveReferences"', () => {
+    it('should cache read results if not writeable, respecting "options.referenceDepth"', () => {
       store.setWriteable(false);
-      expect(store.get('boop')).to.eql(['bat', ['foo', 'bar']]);
-      expect(store._cache).to.have.property('boop:true');
-      expect(store.get('boop', { resolveReferences: false })).to.eql(['__ref:bar', '__ref:bat']);
-      expect(store._cache).to.have.property('boop:false');
-      expect(store._cache['boob:true']).to.not.equal(store._cache['boop:false']);
+      expect(store.get('boop')).to.eql(['bat', { bar: 'foo', boo: '__ref:boo', bat: '__ref:bar' }]);
+      expect(store._cache).to.have.property('boop:1');
+      expect(store.get('boop', { referenceDepth: 0 })).to.eql(['__ref:bar', '__ref:foo']);
+      expect(store._cache).to.have.property('boop:0');
+      expect(store._cache['boob:1']).to.not.equal(store._cache['boop:0']);
     });
   });
 
@@ -119,7 +125,7 @@ describe('DataStore', () => {
       try {
         store.set('foo', 'bar');
         expect(false);
-      } catch(err) {
+      } catch (err) {
         expect(store._data.foo).to.not.equal('bar');
       }
     });

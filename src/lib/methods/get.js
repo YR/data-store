@@ -26,15 +26,15 @@ function get(store, key, options) {
  * @param {DataStore} store
  * @param {String} key
  * @param {Object} [options]
- *  - {Boolean} resolveReferences
+ *  - {Number} referenceDepth
  * @returns {*}
  */
 function doGet(store, key, options = {}) {
   // Resolve back to original key if referenced
   key = store._resolveRefKey(key);
 
-  const { resolveReferences = true } = options;
-  const cacheKey = `${key}:${resolveReferences}`;
+  const { referenceDepth = 1 } = options;
+  const cacheKey = `${key}:${referenceDepth}`;
   const shouldCache = !store._isWritable;
 
   if (shouldCache) {
@@ -45,28 +45,58 @@ function doGet(store, key, options = {}) {
 
   let value = property.get(store._data, key);
 
-  if (resolveReferences) {
-    // Shallow resolve embedded references
-    // Should in theory mutate value, but may cause false equality with previous
-    if (Array.isArray(value)) {
-      value = value.map(item => {
-        return store._isRefValue(item) ? property.get(store._data, store._parseRefKey(item)) : item;
-      });
-    } else if (isPlainObject(value)) {
-      const v = {};
-
-      for (const prop in value) {
-        v[prop] = store._isRefValue(value[prop])
-          ? property.get(store._data, store._parseRefKey(value[prop]))
-          : value[prop];
-      }
-
-      value = v;
-    }
+  if (referenceDepth > 0) {
+    value = resolveReferences(store, value, referenceDepth);
   }
 
   if (shouldCache) {
     store._cache[cacheKey] = value;
+  }
+
+  return value;
+}
+
+/**
+ * Resolve all references in 'value' up to max 'depth'
+ * @param {DataStore} store
+ * @param {Object} value
+ * @param {Number} depth
+ * @returns {Object}
+ */
+function resolveReferences(store, value, depth) {
+  if (--depth < 0) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const n = value.length;
+    const v = new Array(n);
+    let item;
+
+    for (let i = n - 1; i >= 0; i--) {
+      item = value[i];
+      v[i] = resolveReferences(
+        store,
+        store._isRefValue(item) ? property.get(store._data, store._parseRefKey(item)) : item,
+        depth
+      );
+    }
+
+    value = v;
+  } else if (isPlainObject(value)) {
+    const v = {};
+    let item;
+
+    for (const prop in value) {
+      item = value[prop];
+      v[prop] = resolveReferences(
+        store,
+        store._isRefValue(item) ? property.get(store._data, store._parseRefKey(item)) : item,
+        depth
+      );
+    }
+
+    value = v;
   }
 
   return value;

@@ -100,7 +100,7 @@ store.get('foo/bar/bat'); //=> true
 ```
 
 `options` include:
-- **`resolveReferences: Boolean`** specify whether to resolve nested reference keys back to their original values [default: `true`]
+- **`referenceDepth: Number`** specify number of levels to traverse to resolve nested reference keys back to their original values [default: `1`]
 
 #### `getAll (keys: Array): Array`
 Batch version of `get()`. Accepts array of `keys`, and returns array of `values`:
