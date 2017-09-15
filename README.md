@@ -1,7 +1,7 @@
 [![NPM Version](https://img.shields.io/npm/v/@yr/data-store.svg?style=flat)](https://npmjs.org/package/@yr/data-store)
 [![Build Status](https://img.shields.io/travis/YR/data-store.svg?style=flat)](https://travis-ci.org/YR/data-store?branch=master)
 
-A data object that supports storing and retrieving data with namespaced keys (`'foo/bar/bat'`), cursors, immutability, data fetching, actions, and a flexible handler api for observation, side effects, computed values and more.
+A data object that supports storing and retrieving data with namespaced keys (`'foo/bar/bat'`), immutability, data fetching, actions, and a flexible handler api for observation, side effects, computed values and more.
 
 ## Usage
 
@@ -155,7 +155,7 @@ Batch version of `unreference()`. Accepts array of referenced `keys`, and return
 Reset/replace underlying data with `data`.
 
 #### `destroy ()`
-Destroy the instance, including all existing cursors.
+Destroy the instance.
 
 #### `setSerialisabilityOfKey (key: String, value: Boolean)`
 Specify serialisablity of `key`. Setting a `key` to `false` will exclude that key when stringifying:
