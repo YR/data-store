@@ -19,8 +19,8 @@ store.get('foo/bar/bat'); //=> true
 #### `create (id: String, data: Object, options: Object): DataStore|FetchableDataStore`
 Instance factory. Options include:
 
-- **`actions: Array`** array of arrays (`[name: String, action: Function]`) for passing to `registerAction` [default: `null`]. See [actions](#actions)
-- **`handlers: Array`** array of arrays (`[match: RegExp, handler: Function]`) for passing to `useHandler` [default: `null`]. See [handlers](#handlers)
+- **`actions: Array`** array of tuples (`[name: String, action: Function]`) for passing to `registerAction` [default: `null`]. See [actions](#actions)
+- **`handlers: Array`** array of tuples (`[match: RegExp, handler: Function]`) for passing to `useHandler` [default: `null`]. See [handlers](#handlers)
 - **`isFetchable: Boolean`** specify whether instance should be a `FetchableDataStore` that supports data fetching [default: `false`]. See [FetchableDataStore](#fetchabledatastore)
 - **`isWritable: Boolean`** specify whether instance should be writable via `set()` [default: `true`]
 - **`serialisableKeys: Object`** object listing keys and their serialisable state [default: `{}`]. See [`setSerialisabilityOfKey()`](#setserialisabilityofkey-key-stringobject-value-boolean)
@@ -56,7 +56,7 @@ Unregister a previously registerd handler:
 store.unuseHandler(/foo/, function (context) { /* */ });
 ```
 
-Batch unregister handlers by passing an array of arrays:
+Batch unregister handlers by passing an array of tuples:
 
 ```js
 store.unuseHandler([
@@ -149,7 +149,7 @@ store.get('stuff/0'); //=> true
 Inverse of `reference()`.
 
 #### `unreferenceAll (keys: Array): Array`
-Batch version of `unreference()`. Accepts array of referenced `keys`, and returns array of keys.
+Batch version of `unreference()`. Accepts array of references, and returns array of keys.
 
 #### `reset (data: Object)`
 Reset/replace underlying data with `data`.
