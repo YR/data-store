@@ -1,7 +1,6 @@
 'use strict';
 
 const agent = require('@yr/agent');
-const assign = require('object-assign');
 const get = require('./get');
 
 const DEFAULT_LOAD_OPTIONS = {
@@ -29,7 +28,7 @@ module.exports = fetch;
  * @returns {Promise<Response>}
  */
 function fetch(store, key, url, options) {
-  options = assign({}, DEFAULT_LOAD_OPTIONS, options);
+  options = Object.assign({}, DEFAULT_LOAD_OPTIONS, options);
   options.cacheControl = parseCacheControl(options.cacheControl);
 
   if (!key) {
@@ -211,7 +210,7 @@ function parseCacheControl(cacheControlString) {
  */
 function mergeCacheControl(cacheControl, defaultCacheControl) {
   if (cacheControl == null) {
-    return assign({}, defaultCacheControl);
+    return Object.assign({}, defaultCacheControl);
   }
 
   return {
@@ -257,12 +256,14 @@ function generateResponseHeaders(expiry = {}, defaultCacheControl, isError) {
   let maxAge;
 
   if (isError) {
-    maxAge = expiry && expiry.expiresIfError > now && expiry.expiresIfError - now < defaultCacheControl.maxAge
-      ? Math.ceil((expiry.expiresIfError - now) / 1000)
-      : defaultCacheControl.maxAge / 1000;
+    maxAge =
+      expiry && expiry.expiresIfError > now && expiry.expiresIfError - now < defaultCacheControl.maxAge
+        ? Math.ceil((expiry.expiresIfError - now) / 1000)
+        : defaultCacheControl.maxAge / 1000;
   } else {
     // Round up to nearest second
-    maxAge = expiry && expiry.expires > now ? Math.ceil((expiry.expires - now) / 1000) : defaultCacheControl.maxAge / 1000;
+    maxAge =
+      expiry && expiry.expires > now ? Math.ceil((expiry.expires - now) / 1000) : defaultCacheControl.maxAge / 1000;
   }
 
   return {

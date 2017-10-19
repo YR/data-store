@@ -1,6 +1,6 @@
 'use strict';
 
-const assign = require('object-assign');
+const agent = require('@yr/agent');
 const debugFactory = require('debug');
 const get = require('./methods/get');
 const HandlerContext = require('./HandlerContext');
@@ -39,7 +39,7 @@ module.exports = class DataStore {
     this._cache = {};
     this._data = {};
     // Allow sub classes to send in methods for registration
-    this._handledMethods = assign({}, HANDLED_METHODS, options.handledMethods || {});
+    this._handledMethods = Object.assign({}, HANDLED_METHODS, options.handledMethods || {});
     this._handlers = [];
     this._isWritable = 'isWritable' in options ? options.isWritable : true;
     this._serialisableKeys = options.serialisableKeys || {};

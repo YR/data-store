@@ -1,6 +1,5 @@
 'use strict';
 
-const assign = require('object-assign');
 const property = require('@yr/property');
 const runtime = require('@yr/runtime');
 
@@ -23,7 +22,7 @@ module.exports = set;
  * @returns {Boolean}
  */
 function set(store, key, value, options) {
-  return doSet(store, key, value, assign({}, DEFAULT_OPTIONS, options));
+  return doSet(store, key, value, Object.assign({}, DEFAULT_OPTIONS, options));
 }
 
 /**

@@ -1,6 +1,5 @@
 'use strict';
 
-const assign = require('object-assign');
 const isPlainObject = require('is-plain-obj');
 
 module.exports = class HandlerContext {
@@ -38,7 +37,7 @@ module.exports = class HandlerContext {
     if (!isPlainObject(prop)) {
       return;
     }
-    this[propName] = assign({}, this[propName], prop);
+    this[propName] = Object.assign({}, this[propName], prop);
   }
 
   /**
