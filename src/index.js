@@ -8,7 +8,6 @@
 'use strict';
 
 const DataStore = require('./lib/DataStore');
-const FetchableDataStore = require('./lib/FetchableDataStore');
 
 module.exports = {
   /**
@@ -24,7 +23,7 @@ module.exports = {
    */
   create(id, data, options) {
     if (options && options.isFetchable) {
-      return new FetchableDataStore(id, data, options);
+      console.warn('[yr/data-store] "isFetchable" option is deprecated. All instances are now fetchable');
     }
     return new DataStore(id, data, options);
   }
