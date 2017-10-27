@@ -38,8 +38,8 @@ function doGet(store, key, options = {}) {
   const shouldCache = !store._isWritable;
 
   if (shouldCache) {
-    if (store._cache[cacheKey]) {
-      return store._cache[cacheKey];
+    if (store._getCache[cacheKey]) {
+      return store._getCache[cacheKey];
     }
   }
 
@@ -50,7 +50,7 @@ function doGet(store, key, options = {}) {
   }
 
   if (shouldCache) {
-    store._cache[cacheKey] = value;
+    store._getCache[cacheKey] = value;
   }
 
   return value;

@@ -94,15 +94,15 @@ describe('DataStore', () => {
     it('should cache read results if not writeable', () => {
       store.setWriteable(false);
       expect(store.get('boo/bat/foo')).to.equal('foo');
-      expect(store._cache).to.have.property('boo/bat/foo:1', 'foo');
+      expect(store._getCache).to.have.property('boo/bat/foo:1', 'foo');
     });
     it('should cache read results if not writeable, respecting "options.referenceDepth"', () => {
       store.setWriteable(false);
       expect(store.get('boop')).to.eql(['bat', { bar: 'foo', boo: '__ref:boo', bat: '__ref:bar' }]);
-      expect(store._cache).to.have.property('boop:1');
+      expect(store._getCache).to.have.property('boop:1');
       expect(store.get('boop', { referenceDepth: 0 })).to.eql(['__ref:bar', '__ref:foo']);
-      expect(store._cache).to.have.property('boop:0');
-      expect(store._cache['boob:1']).to.not.equal(store._cache['boop:0']);
+      expect(store._getCache).to.have.property('boop:0');
+      expect(store._getCache['boob:1']).to.not.equal(store._getCache['boop:0']);
     });
   });
 

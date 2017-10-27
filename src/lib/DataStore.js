@@ -39,8 +39,8 @@ module.exports = class DataStore {
     this.id = id || `store${++uid}`;
 
     this._actions = {};
-    this._cache = {};
     this._data = {};
+    this._getCache = {};
     // Allow sub classes to send in methods for registration
     this._handledMethods = Object.assign({}, HANDLED_METHODS, options.handledMethods || {});
     this._handlers = [];
@@ -181,7 +181,7 @@ module.exports = class DataStore {
       // Clear cache when toggling.
       // It would be more efficient to selectively invalidate keys,
       // but dangerous due to immutability and refs.
-      this._cache = {};
+      this._getCache = {};
     }
   }
 
@@ -368,14 +368,20 @@ module.exports = class DataStore {
    * Destroy instance
    */
   destroy() {
-    this.abort();
-    this.destroyed = true;
-    this._actions = {};
-    this._cache = {};
-    this._data = {};
-    this._handlers = [];
-    this._serialisableKeys = {};
-    this.debug('destroyed');
+    if (!this.destroyed) {
+      this.abort();
+      this.destroyed = true;
+      this._actions = {};
+      this._data = {};
+      this._getCache = {};
+      this._handledMethods = {};
+      this._handlers = [];
+      this._serialisableKeys = {};
+      if (this.debug) {
+        this.debug('destroyed');
+        this.debug = undefined;
+      }
+    }
   }
 
   /**
