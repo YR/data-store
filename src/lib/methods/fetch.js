@@ -94,6 +94,11 @@ function doFetch(store, key, url, options) {
           });
         })
         .catch(err => {
+          // Abort if already destroyed
+          if (store.destroyed) {
+            return null;
+          }
+
           isExpired = hasExpired(value && value[store.EXPIRY_KEY], true);
 
           if (rejectOnError && isExpired) {
@@ -149,6 +154,11 @@ function load(store, key, url, options) {
     .timeout(timeout)
     .retry(retry)
     .then(res => {
+      // Abort if already destroyed
+      if (store.destroyed) {
+        throw Error('store destroyed');
+      }
+
       store.debug('loaded "%s" in %dms', key, res.duration);
 
       // Guard against empty data
@@ -165,6 +175,11 @@ function load(store, key, url, options) {
       return res;
     })
     .catch(err => {
+      // Abort if already destroyed
+      if (store.destroyed) {
+        throw err;
+      }
+
       store.debug('unable to load "%s" from %s', key, url);
 
       if (rejectOnError) {

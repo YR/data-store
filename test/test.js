@@ -302,6 +302,21 @@ describe('DataStore', () => {
       agent.abortAll();
       setTimeout(done, 100);
     });
+    it('should do nothing when store destroyed', done => {
+      fake
+        .get('/beep')
+        .delayConnection(50)
+        .reply(200, { beep: 'beep' });
+
+      store
+        .fetch('beep', 'http://localhost/beep', { retry: 0, timeout: 10 })
+        .then(response => {
+          throw Error('expected an error');
+        })
+        .catch(done);
+      store.destroy();
+      setTimeout(done, 100);
+    });
     it('should allow handling', () => {
       fake
         .get('/foo')
