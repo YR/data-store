@@ -16,7 +16,6 @@ const HANDLED_METHODS = {
 };
 const EXPIRY_KEY = '__expiry';
 const REF_KEY = '__ref:';
-const NOOP = function noop() {};
 
 let uid = 0;
 
@@ -379,7 +378,7 @@ module.exports = class DataStore {
       this._handlers = [];
       this._serialisableKeys = {};
       this.debug('destroyed');
-      this.debug = NOOP;
+      this.debug.destroy();
     }
   }
 
