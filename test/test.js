@@ -339,6 +339,12 @@ describe('DataStore', () => {
         expect(run).to.equal(1);
       });
     });
+    it('should resolve with passed response object', () => {
+      return store.fetch({ body: '', duration: 1, headers: {}, key: 'foo', status: 200 }).then(response => {
+        expect(response.body).to.equal('');
+        expect(response.status).to.equal(200);
+      });
+    });
   });
 
   describe('fetchAll()', () => {
@@ -367,6 +373,52 @@ describe('DataStore', () => {
         .then(responses => {
           expect(responses[0].body).to.have.property('foo', 'foo');
           expect(responses[1].body).to.have.property('bar', 'bar');
+        });
+    });
+    it('should resolve with empty response if missing "key"', () => {
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' })
+        .get('/bar')
+        .reply(200, { bar: 'bar' });
+      store.setAll({
+        'foo/__expiry': { expires: 0, expiresIfError: {} },
+        'bar/__expiry': { expires: 0, expiresIfError: {} }
+      });
+
+      return store
+        .fetchAll([
+          [null, 'bar', {}],
+          ['foo', 'http://localhost/foo', { staleWhileRevalidate: false }],
+          ['bar', 'http://localhost/bar', { staleWhileRevalidate: false }]
+        ])
+        .then(responses => {
+          expect(responses[0].body).to.equal(undefined);
+          expect(responses[1].body).to.have.property('foo', 'foo');
+          expect(responses[2].body).to.have.property('bar', 'bar');
+        });
+    });
+    it('should resolve with passed response objects', () => {
+      fake
+        .get('/foo')
+        .reply(200, { foo: 'foo' })
+        .get('/bar')
+        .reply(200, { bar: 'bar' });
+      store.setAll({
+        'foo/__expiry': { expires: 0, expiresIfError: {} },
+        'bar/__expiry': { expires: 0, expiresIfError: {} }
+      });
+
+      return store
+        .fetchAll([
+          { body: '', duration: 1, headers: {}, key: 'foo', status: 200 },
+          ['foo', 'http://localhost/foo', { staleWhileRevalidate: false }],
+          ['bar', 'http://localhost/bar', { staleWhileRevalidate: false }]
+        ])
+        .then(responses => {
+          expect(responses[0].body).to.equal('');
+          expect(responses[1].body).to.have.property('foo', 'foo');
+          expect(responses[2].body).to.have.property('bar', 'bar');
         });
     });
   });

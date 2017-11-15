@@ -314,6 +314,10 @@ module.exports = class DataStore {
    * @returns {Promise}
    */
   fetch(key, url, options) {
+    // Handle passing existing response
+    if (key != null && typeof key !== 'string' && 'body' in key && 'status' in key) {
+      return Promise.resolve(key);
+    }
     return this._routeHandledMethod('fetch', key, url, options);
   }
 
@@ -335,6 +339,11 @@ module.exports = class DataStore {
     if (Array.isArray(keys)) {
       return Promise.all(
         keys.map(args => {
+          // Handle passing existing response
+          if (args != null && !Array.isArray(args) && 'body' in args && 'status' in args) {
+            return args;
+          }
+
           const [key, url, opts = {}] = args;
 
           return this._routeHandledMethod('fetch', key, url, Object.assign({}, options, opts));
