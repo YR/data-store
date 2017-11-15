@@ -37,9 +37,9 @@
     "babel-plugin-transform-exponentiation-operator": "6.24.1",
     "babel-plugin-transform-object-rest-spread": "6.26.0",
     "buddy": "6.x.x",
-    "chai": "*",
-    "mocha": "*",
-    "nock": "*"
+    "chai": "4.1.x",
+    "mocha": "4.x.x",
+    "nock": "9.x.x"
   },
   "main": "src/index.js",
   "repository": "https://github.com/YR/data-store.git",
