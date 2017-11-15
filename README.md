@@ -176,8 +176,6 @@ JSON.stringify(store); //=> { "bar": false }
 #### `dump (stringify: Boolean): Object|String`
 Retrieve all data as `Object` or `String` (if `stringify` argument is `true`).
 
-### `FetchableDataStore`
-
 #### `fetch (key: String, url: String, options: Object): Promise`
 Retrieve value stored at `key`. If the stored value has not yet been set, or is set but expired (based on `expires` header), load from `url`:
 
