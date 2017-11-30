@@ -610,39 +610,6 @@ describe('DataStore', () => {
       expect(run).to.equal(2);
     });
   });
-
-  describe('actions', () => {
-    it('should reject if no action registered', () => {
-      return store.trigger('bar').catch(err => {
-        expect(store.get('bar')).to.equal('bat');
-        expect(err.message).to.equal('action bar not registered');
-      });
-    });
-    it('should register an action', () => {
-      store.registerAction('foo', store => {
-        store.set('foo', 'foo');
-      });
-      return store.trigger('foo').then(() => {
-        expect(store.get('foo')).to.equal('foo');
-      });
-    });
-    it('should register an action with passed arguments', () => {
-      store.registerAction('foo', (store, bar) => {
-        store.set('foo', bar);
-      });
-      return store.trigger('foo', 'bar').then(() => {
-        expect(store.get('foo')).to.equal('bar');
-      });
-    });
-    it('should unregister an action', () => {
-      store.registerAction('foo', store => {
-        store.set('foo', 'foo');
-      });
-      expect(store._actions).to.have.property('foo');
-      store.unregisterAction('foo');
-      expect(store._actions).to.not.have.property('foo');
-    });
-  });
 });
 
 describe('HandlerContext', () => {

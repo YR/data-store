@@ -38,7 +38,6 @@ module.exports = class DataStore {
     this.destroyed = false;
     this.id = id || `store${++uid}`;
 
-    this._actions = {};
     this._data = {};
     this._getCache = {};
     // Allow sub classes to send in methods for registration
@@ -51,9 +50,6 @@ module.exports = class DataStore {
 
     if (options.handlers) {
       this.useHandler(options.handlers);
-    }
-    if (options.actions) {
-      this.registerAction(options.actions);
     }
 
     this.reset(data || {});
@@ -107,68 +103,6 @@ module.exports = class DataStore {
         }
       }
     }
-  }
-
-  /**
-   * Register 'action' under 'name'
-   * @param {String|Array} name
-   * @param {Function} action
-   */
-  registerAction(name, action) {
-    const names = !Array.isArray(name) ? [[name, action]] : name;
-    let count = 0;
-
-    names.forEach(([name, action]) => {
-      if (typeof action === 'function') {
-        this._actions[name] = action;
-        count++;
-      }
-    });
-
-    if (count) {
-      this.debug(`registered ${count} new action${count > 1 ? 's' : ''}`);
-    }
-  }
-
-  /**
-   * Unregister 'name' action
-   * @param {String|Array} name
-   * @param {Function} action
-   */
-  unregisterAction(name, action) {
-    const names = !Array.isArray(name) ? [[name, action]] : name;
-
-    names.forEach(([name]) => {
-      if (this._actions[name]) {
-        delete this._actions[name];
-      }
-    });
-  }
-
-  /**
-   * Trigger registered action with optional 'args
-   * @param {String} name
-   * @param {Array} [args]
-   * @returns {Promise}
-   */
-  trigger(name, ...args) {
-    if (!this._isWritable) {
-      this.setWriteable(true);
-    }
-
-    const action = this._actions[name];
-
-    if (!action) {
-      const reason = `action ${name} not registered`;
-
-      this.debug(reason);
-      return Promise.reject(new Error(reason));
-    }
-
-    this.debug(`triggering ${name} action`);
-    const promise = action(this, ...args);
-
-    return promise || Promise.resolve();
   }
 
   /**
@@ -380,7 +314,6 @@ module.exports = class DataStore {
     if (!this.destroyed) {
       this.abort();
       this.destroyed = true;
-      this._actions = {};
       this._data = {};
       this._getCache = {};
       this._handledMethods = {};
