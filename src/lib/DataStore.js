@@ -42,10 +42,6 @@ module.exports = class DataStore {
 
     this.debug('created');
 
-    if (options.handlers) {
-      this.useHandler(options.handlers);
-    }
-
     this.reset(data || {});
   }
 
