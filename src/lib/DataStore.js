@@ -145,7 +145,6 @@ module.exports = class DataStore {
    */
   destroy() {
     if (!this.destroyed) {
-      this.abort();
       this.destroyed = true;
       this._data = {};
       this._getCache = {};
