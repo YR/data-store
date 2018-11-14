@@ -1,6 +1,5 @@
 'use strict';
 
-const isPlainObject = require('is-plain-obj');
 const property = require('@yr/property');
 
 module.exports = get;
