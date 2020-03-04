@@ -1,5 +1,5 @@
 [![NPM Version](https://img.shields.io/npm/v/@yr/data-store.svg?style=flat)](https://npmjs.org/package/@yr/data-store)
-[![Build Status](https://img.shields.io/travis/YR/data-store.svg?style=flat)](https://travis-ci.org/YR/data-store?branch=master)
+[![Build Status](https://img.shields.io/travis/nrkno/yr-data-store.svg?style=flat)](https://travis-ci.org/nrkno/yr-data-store?branch=master)
 
 A data object that supports storing and retrieving data with namespaced keys (`'foo/bar/bat'`), immutability, data
 fetching, and a flexible handler api for observation, side effects, computed values and more.
