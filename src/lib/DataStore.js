@@ -1,15 +1,15 @@
-'use strict';
+"use strict";
 
-const debugFactory = require('debug');
-const get = require('./methods/get');
+const debugFactory = require("debug");
+const get = require("./methods/get");
 
-const isPlainObject = require('is-plain-obj');
+const isPlainObject = require("is-plain-obj");
 
-const set = require('./methods/set');
+const set = require("./methods/set");
 
 const HANDLED_METHODS = {
-  reset: [reset, ['data']],
-  set: [set, ['key', 'value', 'options']]
+  reset: [reset, ["data"]],
+  set: [set, ["key", "value", "options"]]
 };
 
 let uid = 0;
@@ -25,26 +25,27 @@ module.exports = class DataStore {
    *  - {Object} serialisableKeys
    */
   constructor(id, data, options = {}) {
-
-
     this.changed = false;
-    this.debug = debugFactory('yr:data' + (id ? ':' + id : ''));
+    this.debug = debugFactory("yr:data" + (id ? ":" + id : ""));
     this.destroyed = false;
     this.id = id || `store${++uid}`;
 
     this._data = {};
     this._getCache = {};
     // Allow sub classes to send in methods for registration
-    this._handledMethods = Object.assign({}, HANDLED_METHODS, options.handledMethods || {});
+    this._handledMethods = Object.assign(
+      {},
+      HANDLED_METHODS,
+      options.handledMethods || {}
+    );
     this._handlers = [];
-    this._isWritable = 'isWritable' in options ? options.isWritable : true;
+    this._isWritable = "isWritable" in options ? options.isWritable : true;
     this._serialisableKeys = options.serialisableKeys || {};
 
-    this.debug('created');
+    this.debug("created");
 
     this.reset(data || {});
   }
-
 
   /**
    * Set writeable state
@@ -98,7 +99,7 @@ module.exports = class DataStore {
       throw Error(`DataStore ${this.id} is not writeable`);
     }
 
-    this.changed = this._routeHandledMethod('set', key, value, options);
+    this.changed = this._routeHandledMethod("set", key, value, options);
   }
 
   /**
@@ -119,7 +120,7 @@ module.exports = class DataStore {
 
     if (isPlainObject(keys)) {
       for (const key in keys) {
-        if (this._routeHandledMethod('set', key, keys[key], options)) {
+        if (this._routeHandledMethod("set", key, keys[key], options)) {
           changed = true;
         }
       }
@@ -133,7 +134,7 @@ module.exports = class DataStore {
    * @param {Object} data
    */
   reset(data) {
-    this._routeHandledMethod('reset', data);
+    this._routeHandledMethod("reset", data);
   }
 
   /**
@@ -147,7 +148,7 @@ module.exports = class DataStore {
       this._handledMethods = {};
 
       this._serialisableKeys = {};
-      this.debug('destroyed');
+      this.debug("destroyed");
       this.debug.destroy();
     }
   }
@@ -158,7 +159,7 @@ module.exports = class DataStore {
    * @param {Boolean} value
    */
   setSerialisabilityOfKey(key, value) {
-    if (key.charAt(0) === '/') {
+    if (key.charAt(0) === "/") {
       key = key.slice(1);
     }
     this._serialisableKeys[key] = value;
@@ -177,7 +178,6 @@ module.exports = class DataStore {
     }
   }
 
-
   /**
    * Prepare for serialisation
    * @param {String} [key]
@@ -190,8 +190,6 @@ module.exports = class DataStore {
     return serialise(null, this._data, this._serialisableKeys);
   }
 
-
-
   /**
    * Route 'fn' through handlers
    * @param {String} methodName
@@ -200,10 +198,10 @@ module.exports = class DataStore {
    */
   _routeHandledMethod(methodName, ...args) {
     const [fn, signature] = this._handledMethods[methodName];
-    const isKeyed = signature[0] === 'key';
-    let [key = '', ...rest] = args;
+    const isKeyed = signature[0] === "key";
+    let [key = "", ...rest] = args;
 
-    if (isKeyed && key && key.charAt(0) === '/') {
+    if (isKeyed && key && key.charAt(0) === "/") {
       key = key.slice(1);
     }
 
@@ -217,7 +215,7 @@ module.exports = class DataStore {
  * @param {Object} data
  */
 function reset(store, data) {
-  store.debug('reset');
+  store.debug("reset");
   store._data = data;
   store.changed = true;
 }
@@ -240,7 +238,11 @@ function serialise(key, data, config) {
       if (config[keyChain] !== false) {
         if (isPlainObject(value)) {
           obj[prop] = serialise(keyChain, value, config);
-        } else if (value != null && typeof value === 'object' && 'toJSON' in value) {
+        } else if (
+          value != null &&
+          typeof value === "object" &&
+          "toJSON" in value
+        ) {
           obj[prop] = value.toJSON();
         } else {
           obj[prop] = value;
@@ -253,4 +255,3 @@ function serialise(key, data, config) {
 
   return config[key] !== false ? data : null;
 }
-

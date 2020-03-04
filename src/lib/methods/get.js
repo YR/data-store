@@ -1,6 +1,6 @@
-'use strict';
+"use strict";
 
-const property = require('@yr/property');
+const property = require("@yr/property");
 
 module.exports = get;
 
@@ -14,7 +14,7 @@ module.exports = get;
  * @returns {*}
  */
 function get(store, key, options) {
-  if (key === '' || key == null) {
+  if (key === "" || key == null) {
     return store._data;
   }
   return doGet(store, key, options);
@@ -29,7 +29,6 @@ function get(store, key, options) {
  * @returns {*}
  */
 function doGet(store, key, options = {}) {
-
   const { referenceDepth = 1 } = options;
   const cacheKey = `${key}:${referenceDepth}`;
   const shouldCache = !store._isWritable;
@@ -42,11 +41,9 @@ function doGet(store, key, options = {}) {
 
   let value = property.get(store._data, key);
 
-
   if (shouldCache) {
     store._getCache[cacheKey] = value;
   }
 
   return value;
 }
-
