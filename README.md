@@ -164,26 +164,3 @@ store.fetch("beep", "http://localhost/beep").then(response => {
 });
 store.abort("beep");
 ```
-
-## Handlers
-
-In principle, the handlers API is similar to route matching in server frameworks, allowing you to match a key (url path)
-with a handler function. In practice, this enables observation, delegation, middleware, and side effects for the
-following methods:
-
-**`DataStore`**
-
-- `set`
-- `reset`
-
-**`FetchableDataStore`**
-
-- `fetch`
-
-Handlers are registered with `DataStore.useHandler(match: String|RegExp|Array, handler: Function)`, and will route an
-operation matching a key (`match`), to a handler function (`handler`). Handlers are executed synchronously, and in
-series.
-
-Matching is based on an optional regular expression or string (`match`). If no `match` is specified (is `null` or
-`undefined`), or if the method does not accept a `key` (as is the case for `reset`), handlers are automatically matched
-and executed.
