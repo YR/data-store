@@ -5,9 +5,9 @@
  * @license MIT
  */
 
-'use strict';
+"use strict";
 
-const DataStore = require('./lib/DataStore');
+const DataStore = require("./lib/DataStore");
 
 module.exports = {
   /**
@@ -23,7 +23,9 @@ module.exports = {
    */
   create(id, data, options) {
     if (options && options.isFetchable) {
-      console.warn('[yr/data-store] "isFetchable" option is deprecated. All instances are now fetchable');
+      console.warn(
+        '[yr/data-store] "isFetchable" option is deprecated. All instances are now fetchable'
+      );
     }
     return new DataStore(id, data, options);
   }

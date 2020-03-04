@@ -1,11 +1,9 @@
 {
   "name": "@yr/data-store",
   "description": "A clever data object",
-  "version": "9.0.1",
+  "version": "10.0.0-alpha-2",
   "author": "Alexander Pope <alexander.pope@nrk.no>",
   "dependencies": {
-    "@yr/agent": "5.0.x",
-    "@yr/keys": "1.1.x",
     "@yr/property": "7.0.x",
     "@yr/runtime": "^3.0.0",
     "debug": "3.x.x",
