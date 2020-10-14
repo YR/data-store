@@ -4,8 +4,8 @@
   "version": "10.0.0",
   "author": "Alexander Pope <alexander.pope@nrk.no>",
   "dependencies": {
-    "@yr/property": "7.0.x",
-    "@yr/runtime": "^3.0.0",
+    "@nrk/yr-property": "^8.0.0",
+    "@nrk/yr-runtime": "^4.0.0",
     "debug": "3.x.x",
     "is-plain-obj": "1.1.x"
   },
