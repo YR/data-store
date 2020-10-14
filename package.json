@@ -42,7 +42,7 @@
   "repository": "https://github.com/YR/data-store.git",
   "license": "MIT",
   "scripts": {
-    "prepublish": "buddy build",
+    "prepublishOnly": "buddy build",
     "test": "NODE_ENV=test mocha test/test.js --reporter spec --bail"
   },
   "browser": "index.js",
