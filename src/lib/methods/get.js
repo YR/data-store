@@ -1,6 +1,6 @@
 "use strict";
 
-const property = require("@yr/property");
+const property = require("@nrk/yr-property");
 
 module.exports = get;
 

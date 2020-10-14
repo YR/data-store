@@ -1,7 +1,7 @@
 "use strict";
 
-const property = require("@yr/property");
-const runtime = require("@yr/runtime");
+const property = require("@nrk/yr-property");
+const runtime = require("@nrk/yr-runtime");
 
 const DEFAULT_OPTIONS = {
   // Browser immutable by default
