@@ -1,7 +1,7 @@
 {
   "name": "@nrk/yr-data-store",
   "description": "A clever data object",
-  "version": "11.0.0",
+  "version": "11.1.0",
   "author": "Alexander Pope <alexander.pope@nrk.no>",
   "dependencies": {
     "@nrk/yr-property": "^8.0.0",
